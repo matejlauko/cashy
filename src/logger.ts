@@ -38,7 +38,11 @@ function write(level: LogLevel, message: string, context?: LogContext): void {
     timestamp: new Date().toISOString(),
   };
 
-  const line = JSON.stringify(entry);
+  const line = JSON.stringify(entry, (_key, value) =>
+    value instanceof Error
+      ? { name: value.name, message: value.message, stack: value.stack }
+      : value,
+  );
 
   if (level === "error") {
     process.stderr.write(line + "\n");
