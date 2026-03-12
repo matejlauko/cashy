@@ -130,7 +130,7 @@ Rules:
 - Users may belong to multiple workspaces in the future.
 - In V1, all members of a workspace can view and edit everything.
 - If a user has only one workspace, the product should enter it directly after login.
-- If a user has multiple workspaces, the product should show a simple workspace selector.
+- If a user has multiple workspaces, V1 should auto-enter the first available workspace (no workspace selector UI in V1).
 
 ### 8.2 User
 
@@ -167,7 +167,7 @@ Rules:
 - `name` is required.
 - `bank / institution name` is optional, so cash can be modeled cleanly.
 - Account names should be unique within a workspace to reduce ambiguity in forms and lists.
-- Credit card balances are entered as a positive owed amount in forms, but displayed and calculated as negative.
+- Credit card balances are entered and stored as positive owed amounts, but displayed and calculated as negative.
 - Account metadata can be edited after creation.
 - Ongoing balance changes must happen only through the balance update flow, not through account edit.
 - Archived accounts are hidden from default active UI and new-entry forms, but their historical records remain available for historical calculations and old references.
@@ -230,7 +230,13 @@ Rules:
 
 ## 9. Metric Definitions
 
-All dashboard math uses the workspace’s financial calendar month. For V1, assume one household timezone for date calculations.
+All dashboard math uses stored business dates (`date` fields) only.
+
+For V1:
+
+- Business events are stored as date-only values (`YYYY-MM-DD`) without time-of-day.
+- Month calculations are based on those stored date values.
+- Audit and logging timestamps are stored as timezone-aware timestamps.
 
 ### 9.1 Effective Account Balance
 
@@ -243,7 +249,8 @@ For a given account and date:
 Credit card rule:
 
 - User input is a positive owed amount.
-- Effective balance is stored/displayed/calculated as negative.
+- Stored balance value remains positive owed amount.
+- Displayed and calculated effective balance is derived as negative.
 
 ### 9.2 Opening Month Balance
 
@@ -322,7 +329,7 @@ The dashboard is the home and primary workflow surface.
 - Only pre-authorized Google users can access the app.
 - Unauthorized users see an access denied state.
 - If the authenticated user belongs to one workspace, they are routed directly into it.
-- If the authenticated user belongs to multiple workspaces, they can choose which workspace to enter.
+- If the authenticated user belongs to multiple workspaces, the app auto-enters the first available workspace.
 - The app must always make the current workspace clear.
 - The app must provide logout.
 
@@ -627,6 +634,7 @@ These are product requirements, not implementation details.
 - Users can access only workspaces they belong to.
 - Workspace data must be isolated from other workspaces.
 - The system should retain created/updated timestamps and acting user for key records to support trust and future auditability.
+- Business dates for financial entries are stored as date-only values; audit/log timestamps are timezone-aware.
 - Sensitive actions such as archive and delete require confirmation.
 - Logout must be available at all times from the authenticated app.
 
@@ -639,6 +647,7 @@ These are product requirements, not implementation details.
 - Bulk balance save always writes a full snapshot for all active accounts shown, even when unchanged.
 - Multiple same-day balance updates are allowed; latest save timestamp wins.
 - Credit card balance input is positive owed amount; displayed and calculated as negative.
+- If a user has multiple workspaces, V1 auto-selects the first available workspace and does not provide a workspace selector UI.
 - Transaction amount input is always positive; sign comes from income/expense type.
 - Transfers are out of scope.
 - Filters, pagination, and stale-data alerts are out of scope.

@@ -187,13 +187,13 @@ No test runner additions are planned because tests are explicitly out of scope f
 
 ### Time and timezone policy
 
-You explicitly do not want application-level timezone logic in V1. That still needs one fixed operational timezone to prevent hidden date bugs.
+You explicitly do not want application-level timezone logic in V1 for financial business dates.
 
 Implementation rule:
 
 - Business dates are stored as `date`, without a timezone.
+- Monthly SQL calculations use those stored dates directly.
 - Audit timestamps are stored as `timestamptz`.
-- Monthly SQL calculations use the dates without a timezone.
 
 ## 6. Database Plan
 
@@ -414,6 +414,29 @@ Rules:
 - `financial_transaction(workspace_id, transaction_date desc)` partial on `deleted_at is null`
 - `financial_account(workspace_id)` partial on `archived_at is null`
 
+### Workspace isolation enforcement
+
+Isolation is enforced at both SQL query level and DB constraint level.
+
+Required foreign keys:
+
+- `workspace_membership.workspace_id -> workspace.id`
+- `workspace_membership.user_id -> user.id`
+- `financial_account.workspace_id -> workspace.id`
+- `balance_snapshot.workspace_id -> workspace.id`
+- `financial_transaction.workspace_id -> workspace.id`
+
+Required cross-workspace consistency constraints:
+
+- add unique key on `financial_account(id, workspace_id)`
+- `balance_snapshot(financial_account_id, workspace_id)` must reference `financial_account(id, workspace_id)`
+- `financial_transaction(financial_account_id, workspace_id)` must reference `financial_account(id, workspace_id)`
+
+Query and mutation rule:
+
+- every workspace-scoped read/write includes `workspace_id = activeWorkspaceId` in the SQL predicate
+- membership must be validated from `workspace_membership` before any workspace-scoped operation
+
 ## 7. Auth Design
 
 ### Better Auth setup
@@ -467,11 +490,75 @@ This satisfies all auth decisions:
 
 ### Manual pre-create contract
 
-Because there is no seed flow, invitation flow, or admin UI, the minimum manual authorization setup is:
+Because there is no seed flow, invitation flow, or admin UI, manual authorization must be done directly in SQL.
+
+Required order:
 
 1. insert a `user` row in the canonical Better Auth `user` table
 2. insert one or more `workspace_membership` rows for that user
-3. optionally prefill `google_sub` if you already know it
+3. optionally prefill `google_sub` if already known
+
+Minimum required `user` values:
+
+- `id`: generated UUID text
+- `email`: lowercase Google email
+- `name`: non-empty display value (fallback to email local-part if unknown)
+- `email_verified`: `true`
+- `created_at`, `updated_at`: `now()`
+- optional `image`: `null`
+- optional `google_sub`: `null` until first login or prefilled manually
+
+Recommended one-transaction SQL template:
+
+```sql
+begin;
+
+insert into "user" (
+  id,
+  email,
+  name,
+  image,
+  email_verified,
+  google_sub,
+  created_at,
+  updated_at
+) values (
+  '<user-id-uuid>',
+  lower('<user-email>'),
+  '<display-name>',
+  null,
+  true,
+  null,
+  now(),
+  now()
+);
+
+insert into workspace_membership (
+  id,
+  workspace_id,
+  user_id,
+  created_at,
+  created_by_user_id,
+  updated_at,
+  updated_by_user_id
+) values (
+  '<membership-id-uuid>',
+  '<workspace-id>',
+  '<user-id-uuid>',
+  now(),
+  '<operator-user-id-or-system>',
+  now(),
+  '<operator-user-id-or-system>'
+);
+
+commit;
+```
+
+Operational notes:
+
+- create one `workspace_membership` row per authorized workspace
+- leave `deleted_at` and `deleted_by_user_id` as `null` for active access
+- do not pre-create `user_account` or `session` rows; Better Auth creates those on successful login
 
 Required operational behavior:
 
@@ -998,7 +1085,7 @@ Because there is no test suite and no staging, this manual checklist is the rele
 ### Workspace
 
 - one-workspace user is auto-entered
-- multi-workspace user can switch workspace
+- multi-workspace user is auto-entered into the first available workspace
 - workspace cookie persists the last valid choice
 
 ### Money flows
