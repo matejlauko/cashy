@@ -63,10 +63,9 @@ export const workspaceMembership = pgTable(
     updatedByUserId: text("updated_by_user_id").notNull(),
   },
   (t) => [
-    unique("workspace_membership_workspace_user_unique").on(
-      t.workspaceId,
-      t.userId,
-    ),
+    uniqueIndex("workspace_membership_workspace_user_unique")
+      .on(t.workspaceId, t.userId)
+      .where(sql`${t.deletedAt} is null`),
   ],
 );
 

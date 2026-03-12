@@ -15,7 +15,7 @@ export const user = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    email: text("email").notNull().unique(),
+    email: text("email").notNull(),
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -27,6 +27,7 @@ export const user = pgTable(
     googleSub: text("google_sub"),
   },
   (t) => [
+    uniqueIndex("user_email_ci_unique").on(sql`lower(${t.email})`),
     uniqueIndex("user_google_sub_unique")
       .on(t.googleSub)
       .where(sql`${t.googleSub} is not null`),
