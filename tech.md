@@ -177,8 +177,8 @@ No test runner additions are planned because tests are explicitly out of scope f
 
 | Variable | Example local value | Notes |
 | --- | --- | --- |
-| `PORT` | `3000` | Bun listen port |
-| `APP_URL` | `http://localhost:3000` | Public app URL |
+| `PORT` | `3050` | Bun listen port |
+| `APP_URL` | `http://localhost:3050` | Public app URL |
 | `DATABASE_URL` | `postgres://app:pass@localhost:5432/app` | Shared by Bun SQL, Drizzle, and auth |
 | `BETTER_AUTH_SECRET` | generated secret | Required by Better Auth |
 | `GOOGLE_CLIENT_ID` | `...` | Google OAuth |
