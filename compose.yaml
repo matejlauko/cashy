@@ -1,1 +1,20 @@
-# TODO: A3 - PostgreSQL 18 local service
+services:
+  postgres:
+    image: postgres:18
+    container_name: money-ts-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "app", "-d", "app"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
