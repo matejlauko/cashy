@@ -1,2 +1,5 @@
-// TODO: A4 - Better Auth client
-export {};
+import { createAuthClient } from "better-auth/react";
+
+export const authClient = createAuthClient({
+  basePath: "/api/auth",
+});
