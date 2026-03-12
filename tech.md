@@ -185,6 +185,10 @@ No test runner additions are planned because tests are explicitly out of scope f
 | `GOOGLE_CLIENT_SECRET` | `...` | Google OAuth |
 | `LOG_LEVEL` | `debug` | Structured debug logging |
 
+### Startup validation
+
+`src/env.ts` validates all required environment variables at import time using Zod. If any variable is missing or invalid, the process exits immediately with an actionable error message listing what is wrong. This module is imported before any other application code runs.
+
 ### Time and timezone policy
 
 You explicitly do not want application-level timezone logic in V1 for financial business dates.
@@ -204,23 +208,32 @@ The schema is code-first and Drizzle is the source of truth.
 - Define schema in Drizzle TypeScript files.
 - Apply changes everywhere with `drizzle-kit push`.
 - Do not keep SQL migration files in the repo.
-- Do not use Better Auth CLI as the migration authority after bootstrap.
+- Do not use Better Auth CLI for migrations at all.
+
+Bootstrap sequence for a fresh database:
+
+1. Define all tables in Drizzle schema files, including Better Auth tables (`user`, `session`, `user_account`, `verification`) with columns that exactly match Better Auth's expected schema.
+2. Run `bunx drizzle-kit push` once. This creates all tables — both auth and app.
+3. Verify by starting the app and confirming Better Auth can read/write its tables without errors.
+
+The Drizzle schema for auth tables is the single source of truth. Better Auth never runs its own migrations. If Better Auth is upgraded and expects new columns, the Drizzle schema must be updated to match before pushing.
 
 Accepted tradeoff:
 
 - This is intentionally a rapid-prototyping workflow.
 - Schema rollback is manual.
 - Production deploys must push schema before rolling the app.
+- Better Auth schema drift after upgrades must be caught manually.
 
 This matches Drizzle's documented `push` workflow for teams that want TypeScript schema as source of truth and do not want to manage SQL migration files.
 
 ### Naming and type rules
 
 - Use snake_case table and column names in Postgres.
-- Keep Better Auth core table names as the default singular names to minimize adapter friction:
+- Keep Better Auth core table names as the default singular names:
   - `user`
   - `session`
-  - `user_account` - renamed from default `account`
+  - `user_account` — renamed from default `account` via Drizzle adapter schema mapping (see §7)
   - `verification`
 - App tables use unambiguous names:
   - `workspace`
@@ -244,8 +257,8 @@ This matches Drizzle's documented `push` workflow for teams that want TypeScript
 Implementation detail:
 
 - Bun SQL is initialized with `bigint: true` so `bigint` columns come back as JS `bigint`.
-- Repository functions normalize DB money values to safe JSON values before returning RPC responses.
-- Server-side parsers and serializers reject values outside JS safe integer range.
+- All money values cross the API boundary as `number`. Repository functions convert via `Number(bigint)` after asserting the value is within `Number.MIN_SAFE_INTEGER` to `Number.MAX_SAFE_INTEGER`. Values outside this range are rejected as a server error.
+- `JSON.stringify` throws on raw `bigint`, so conversion must happen in the repository layer before any response is built.
 - This keeps API payloads simple while retaining `bigint` safety in Postgres.
 
 ### Audit pattern
@@ -382,6 +395,17 @@ Rules:
 - latest saved row by `created_at`, then `id`, wins for that account and date
 - one insert per active account on every bulk save
 
+Standard resolution query pattern for "effective balance of account X on date D":
+
+```sql
+SELECT amount_minor_raw FROM balance_snapshot
+WHERE financial_account_id = $1 AND effective_date <= $2
+ORDER BY effective_date DESC, created_at DESC, id DESC
+LIMIT 1
+```
+
+All balance-related queries (prefill, dashboard summary, chart) reuse this ordering convention.
+
 #### `financial_transaction`
 
 Fields:
@@ -452,6 +476,22 @@ Use Better Auth with:
 - no email/password
 - no signup UI
 
+Drizzle adapter table mapping:
+
+The default Better Auth `account` table is renamed to `user_account` to avoid collision with `financial_account`. This is configured via the Drizzle adapter `schema` mapping, not via `account.modelName` (which has a known upstream bug):
+
+```typescript
+database: drizzleAdapter(drizzleDb, {
+  provider: "pg",
+  schema: {
+    user: schema.user,
+    account: schema.userAccount,  // maps logical "account" to physical "user_account"
+    session: schema.session,
+    verification: schema.verification,
+  },
+}),
+```
+
 Google provider config:
 
 - `prompt: "select_account"` so the user explicitly picks the correct Google account
@@ -459,32 +499,62 @@ Google provider config:
   - local: `http://localhost:3000/api/auth/callback/google`
   - prod: `https://<your-domain>/api/auth/callback/google`
 
-### Hard deny before session creation
+### Hard deny for unauthorized users
 
 This is the most important auth customization.
 
 Desired behavior:
 
 - only pre-created users with pre-linked workspace membership may log in
-- unauthorized Google accounts are denied before a usable session is created
+- unauthorized Google accounts are denied and their sessions are cleaned up immediately
+
+Better Auth limitation:
+
+- Better Auth does not provide a pre-session hook that can abort OAuth sign-in before a session is created.
+- The deny must happen in a `hooks.after` middleware that runs after the OAuth callback completes.
+
+Implementation mechanism — `hooks.after` with `createAuthMiddleware`:
+
+```typescript
+hooks: {
+  after: createAuthMiddleware(async (ctx) => {
+    if (ctx.path.startsWith("/sign-in/social")) {
+      const newSession = ctx.context.newSession;
+      if (!newSession) return; // no session created, nothing to check
+
+      const user = newSession.user;
+      // 1. Check workspace membership via direct SQL query
+      // 2. If unauthorized: delete session, redirect to /login?error=access_denied
+      // 3. If authorized: update google_sub/email/name/image on user row
+    }
+  }),
+}
+```
 
 Planned flow:
 
 1. User clicks Google sign-in on `/login`.
 2. Google returns profile data including email and subject (`sub`).
-3. Better Auth before-hook checks for an existing allowed user:
-   - first by `google_sub = provider_sub`
+3. Better Auth creates or finds the user row and creates a session (this is automatic).
+4. The `hooks.after` middleware fires for the social sign-in path.
+5. The hook checks for an allowed user with workspace membership:
+   - match by `google_sub = provider_sub`
    - otherwise by `email = lower(provider_email)` and `google_sub is null`
-4. The same lookup also requires at least one non-deleted `workspace_membership`.
-5. If no record matches, reject the sign-in and redirect back to `/login?error=access_denied`.
-6. If a record matches and `google_sub` is still null, persist the Google subject to the `user` row.
-7. Update `user.email`, `user.name`, and `user.image` from the Google profile.
-8. Allow Better Auth to create or update the provider `account` row and create the session row.
+   - require at least one non-deleted `workspace_membership`
+6. If no match: delete the just-created session via `ctx.context.adapter.delete({ model: "session", where: [...] })`, then return `Response.redirect("/login?error=access_denied")`.
+7. If a match exists and `google_sub` is still null, persist the Google subject to the `user` row.
+8. Update `user.email`, `user.name`, and `user.image` from the Google profile.
+9. Allow the response to proceed normally (session cookie is already set).
+
+Accepted tradeoff:
+
+- A session is briefly created before being deleted for unauthorized users. This is a few milliseconds of DB state, not a security window, because the hook runs before the response reaches the client.
+- This is the documented Better Auth pattern for post-OAuth validation.
 
 This satisfies all auth decisions:
 
 - canonical Better Auth tables
-- hard deny
+- hard deny (with immediate cleanup)
 - keyed by both email and Google subject
 - email changes follow the Google account after first successful login
 
@@ -633,6 +703,10 @@ Security rule:
 - `GET /readyz`
   - runs a lightweight DB check such as `select 1`
 
+Session validation at the Bun level:
+
+These routes are served directly by Bun, not Hono, so they cannot use Hono middleware for session resolution. Instead, `src/index.ts` imports the `auth` instance from `src/auth/auth.ts` and calls `auth.api.getSession({ headers: req.headers })` directly. This returns the session or `null` without going through the Hono stack.
+
 ### Hono responsibilities
 
 Hono handles JSON endpoints only.
@@ -658,9 +732,43 @@ Route groups:
 
 No CORS configuration is needed in V1 because the frontend and API are same-origin.
 
+CSRF protection: all mutation endpoints accept only `application/json` bodies. Combined with `SameSite=Lax` cookies and same-origin deployment, this is sufficient for V1. Browsers will not send cross-origin JSON POST requests with cookies without a preflight, which will fail because there is no CORS config.
+
+### Error response shape
+
+All API errors use a consistent JSON shape:
+
+```typescript
+{ error: { code: string; message: string } }
+```
+
+HTTP status conventions:
+
+- `400` — validation failure, bad input
+- `401` — no valid session
+- `403` — authenticated but not authorized (wrong workspace, archived account, etc.)
+- `404` — resource not found within the authorized scope
+- `500` — unexpected server error
+
+The centralized error middleware catches thrown errors and serializes them into this shape. Domain errors (e.g., "cannot archive account with non-zero balance") use `400` with a descriptive `code` like `ACCOUNT_BALANCE_NOT_ZERO`.
+
 ### Hono RPC typing
 
 Export `AppType` from the Hono app and use `hc<AppType>()` in the client.
+
+Route type composition: each route group file (e.g., `src/api/routes/accounts.ts`) exports its own sub-app created via `new Hono()`. The main `src/api/app.ts` mounts them with chained `.route()` calls and `AppType` is inferred from the full chain:
+
+```typescript
+const app = new Hono()
+  .route("/auth", authRoutes)
+  .route("/session", sessionRoutes)
+  .route("/accounts", accountRoutes)
+  // ...
+
+export type AppType = typeof app;
+```
+
+This chained pattern is required for Hono RPC to infer endpoint types. If routes are mounted with `app.route()` as statements (not chained), the type information is lost.
 
 That gives:
 
@@ -700,6 +808,8 @@ Bun SQL fit for this project:
 ### Shared parsing and validation
 
 Shared Zod schemas live under `src/schemas/*`.
+
+Schema boundary rule: schemas in `src/schemas/*` define the API request/response contract (money as `number` in minor units, dates as `YYYY-MM-DD` strings). Client-side forms may use derived schemas that accept raw user input (e.g., money as decimal string). The transformation from form input to API payload happens in the form's `onSubmit` handler, not in the shared schema.
 
 Shared helpers:
 
@@ -770,6 +880,25 @@ Implementation rule:
 #### Dashboard chart
 
 Use `generate_series()` from month start through today and, for each day, select the latest snapshot on or before that day per account, then sum signed balances.
+
+Query shape: use a `LATERAL` join from the day series × accounts to find the latest snapshot per account per day. This avoids N×30 subqueries:
+
+```sql
+SELECT d.day, SUM(signed_balance)
+FROM generate_series(month_start, today, '1 day') AS d(day)
+CROSS JOIN financial_account AS a
+LEFT JOIN LATERAL (
+  SELECT amount_minor_raw
+  FROM balance_snapshot
+  WHERE financial_account_id = a.id
+    AND effective_date <= d.day
+  ORDER BY effective_date DESC, created_at DESC, id DESC
+  LIMIT 1
+) AS snap ON true
+WHERE a.workspace_id = $1
+GROUP BY d.day
+ORDER BY d.day;
+```
 
 This gives:
 
@@ -932,6 +1061,14 @@ Build explicit empty states for:
 
 Each state should explain the missing prerequisite and surface the next action.
 
+### Loading and error states
+
+- Use TanStack Query's built-in `isPending` and `isError` states.
+- Show inline skeleton/spinner for data loading, not full-page loaders.
+- Show toast notifications (via shadcn/ui `sonner` or similar) for mutation errors and success feedback.
+- On bootstrap failure (session query fails), redirect to `/login` rather than showing a broken shell.
+- No custom error boundary in V1 — let React's default error handling surface unexpected crashes.
+
 ## 11. Logging and Diagnostics
 
 ### Logging format
@@ -1006,11 +1143,13 @@ Keep production simple and close to the current base:
 Suggested `Dockerfile` shape:
 
 1. base image: `oven/bun`
-2. copy `package.json`, `bun.lock`, source files
-3. `bun install --frozen-lockfile --production`
-4. run `bun src/index.ts`
+2. copy `package.json`, `bun.lock`
+3. `bun install --frozen-lockfile`
+4. copy source files
+5. `bun run build.ts` — builds frontend HTML/CSS/JS bundles into `dist/`
+6. run `bun src/index.ts`
 
-This preserves Bun HTML imports and avoids inventing a new runtime shape for V1.
+Note: the build step is required because Bun's HTML imports with React/TSX need bundling. In development, Bun handles this on-the-fly with HMR. In production, `build.ts` produces static bundles that the server serves. Dev dependencies are needed during the build step, so `--production` is not used on `bun install`.
 
 ### k3s resources
 
@@ -1109,17 +1248,19 @@ Because there is no test suite and no staging, this manual checklist is the rele
 - logs show request id, user id, and workspace id on mutations
 
 
-## 16. Accepted Risks and Tradeoffs
+## 15. Accepted Risks and Tradeoffs
 
 - `drizzle-kit push` in production is intentionally accepted for speed.
 - No test suite means regressions are caught by typechecking and manual smoke only.
 - No staging means production rollout discipline matters more than usual.
 - No URL routing means no deep links to accounts or transactions.
 - Manual user/workspace management remains an external operational task.
+- No rate limiting on auth or API endpoints. The app is not publicly discoverable and serves two known users. If abuse becomes a concern, add rate limiting to the auth callback path first.
+- Auth deny creates and immediately deletes a session (Better Auth limitation). This is not a security window because it happens before the response reaches the client.
 
 These are not oversights. They are deliberate constraints for the MVP.
 
-## 17. Reference Docs
+## 16. Reference Docs
 
 - [Bun server and HTML imports](https://bun.com/docs/runtime/http/server)
 - [Bun full-stack HTML import workflow](https://bun.com/docs/bundler/fullstack)
