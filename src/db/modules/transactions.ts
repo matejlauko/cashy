@@ -90,6 +90,9 @@ export async function listRecent(
   workspaceId: string,
   limit: number,
 ): Promise<TransactionRow[]> {
+  const monthStart = currentMonthStart();
+  const monthEnd = nextMonthStart();
+
   const rows = await sql`
     SELECT
       ft.id,
@@ -106,6 +109,8 @@ export async function listRecent(
       ON fa.id = ft.financial_account_id
       AND fa.workspace_id = ft.workspace_id
     WHERE ft.workspace_id = ${workspaceId}
+      AND ft.transaction_date >= ${monthStart}
+      AND ft.transaction_date < ${monthEnd}
       AND ft.deleted_at IS NULL
     ORDER BY ft.transaction_date DESC, ft.created_at DESC
     LIMIT ${limit}

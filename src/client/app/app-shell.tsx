@@ -70,6 +70,9 @@ async function getErrorMessage(res: Response, fallback: string) {
 
 export function AppShell() {
   const [activeSection, setActiveSection] = useState<Section>("dashboard");
+  const [focusTransactionId, setFocusTransactionId] = useState<string | null>(
+    null,
+  );
   const [workspaceSwitchError, setWorkspaceSwitchError] = useState<
     string | null
   >(null);
@@ -232,6 +235,7 @@ export function AppShell() {
       });
 
       await queryClient.refetchQueries({ queryKey: ["session"] });
+      setFocusTransactionId(null);
     } catch (switchError) {
       if (
         switchError instanceof SessionBootstrapError &&
@@ -249,6 +253,18 @@ export function AppShell() {
     } finally {
       setIsSwitchingWorkspace(false);
     }
+  };
+
+  const handleSectionChange = (section: Section) => {
+    setActiveSection(section);
+    if (section !== "transactions") {
+      setFocusTransactionId(null);
+    }
+  };
+
+  const handleDashboardEditTransaction = (transactionId: string) => {
+    setFocusTransactionId(transactionId);
+    setActiveSection("transactions");
   };
 
   return (
@@ -313,7 +329,7 @@ export function AppShell() {
                 key={s.id}
                 variant={activeSection === s.id ? "secondary" : "ghost"}
                 size="sm"
-                onClick={() => setActiveSection(s.id)}
+                onClick={() => handleSectionChange(s.id)}
                 className="flex-1 sm:flex-initial"
               >
                 <Icon className="size-4" />
@@ -331,13 +347,21 @@ export function AppShell() {
           </div>
         ) : null}
         {activeSection === "dashboard" && (
-          <DashboardView workspaceId={session.activeWorkspaceId} />
+          <DashboardView
+            workspaceId={session.activeWorkspaceId}
+            onNavigate={handleSectionChange}
+            onEditTransaction={handleDashboardEditTransaction}
+          />
         )}
         {activeSection === "accounts" && (
           <AccountsView workspaceId={session.activeWorkspaceId} />
         )}
         {activeSection === "transactions" && (
-          <TransactionsView workspaceId={session.activeWorkspaceId} />
+          <TransactionsView
+            workspaceId={session.activeWorkspaceId}
+            focusTransactionId={focusTransactionId}
+            onFocusTransactionHandled={() => setFocusTransactionId(null)}
+          />
         )}
       </main>
     </div>

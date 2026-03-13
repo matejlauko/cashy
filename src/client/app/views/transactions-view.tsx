@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useTransactions,
   type Transaction,
@@ -26,9 +26,15 @@ import { Plus, ArrowLeftRight, Trash2 } from "lucide-react";
 
 interface TransactionsViewProps {
   workspaceId: string;
+  focusTransactionId?: string | null;
+  onFocusTransactionHandled?: () => void;
 }
 
-export function TransactionsView({ workspaceId }: TransactionsViewProps) {
+export function TransactionsView({
+  workspaceId,
+  focusTransactionId,
+  onFocusTransactionHandled,
+}: TransactionsViewProps) {
   const { data: transactions, isLoading, isError, error } =
     useTransactions(workspaceId);
 
@@ -43,6 +49,18 @@ export function TransactionsView({ workspaceId }: TransactionsViewProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletingTransaction, setDeletingTransaction] =
     useState<Transaction | null>(null);
+
+  useEffect(() => {
+    if (!focusTransactionId || !transactions) return;
+
+    const transaction = transactions.find((tx) => tx.id === focusTransactionId);
+    if (transaction) {
+      setEditingTransaction(transaction);
+      setFormOpen(true);
+    }
+
+    onFocusTransactionHandled?.();
+  }, [focusTransactionId, onFocusTransactionHandled, transactions]);
 
   const handleCreate = () => {
     setEditingTransaction(null);
