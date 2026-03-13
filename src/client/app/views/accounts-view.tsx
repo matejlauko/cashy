@@ -10,6 +10,7 @@ import {
 } from "@/client/app/features/accounts/use-account-mutations";
 import { AccountFormDialog } from "@/client/app/features/accounts/account-form";
 import { ArchiveConfirmDialog } from "@/client/app/features/accounts/archive-confirm";
+import { BalanceUpdateFormDialog } from "@/client/app/features/balance-snapshots/balance-update-form";
 import type {
   CreateAccountInput,
   UpdateAccountInput,
@@ -18,7 +19,7 @@ import { ACCOUNT_TYPE_LABELS } from "@/schemas/accounts";
 import { formatMoneyMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Archive, Wallet } from "lucide-react";
+import { Plus, Pencil, Archive, Wallet, RefreshCw } from "lucide-react";
 
 interface AccountsViewProps {
   workspaceId: string;
@@ -38,6 +39,7 @@ export function AccountsView({ workspaceId }: AccountsViewProps) {
   const [archivingAccount, setArchivingAccount] = useState<Account | null>(
     null,
   );
+  const [balanceUpdateOpen, setBalanceUpdateOpen] = useState(false);
 
   const handleCreate = () => {
     setEditingAccount(null);
@@ -106,10 +108,21 @@ export function AccountsView({ workspaceId }: AccountsViewProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Accounts</h1>
-        <Button size="sm" onClick={handleCreate}>
-          <Plus className="size-4" />
-          Create Account
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBalanceUpdateOpen(true)}
+            disabled={!hasAccounts}
+          >
+            <RefreshCw className="size-4" />
+            Update Balances
+          </Button>
+          <Button size="sm" onClick={handleCreate}>
+            <Plus className="size-4" />
+            Create Account
+          </Button>
+        </div>
       </div>
 
       {!hasAccounts ? (
@@ -192,6 +205,12 @@ export function AccountsView({ workspaceId }: AccountsViewProps) {
         account={archivingAccount}
         onConfirm={handleArchiveConfirm}
         isPending={archiveMutation.isPending}
+      />
+      <BalanceUpdateFormDialog
+        open={balanceUpdateOpen}
+        onOpenChange={setBalanceUpdateOpen}
+        workspaceId={workspaceId}
+        onCreateAccount={handleCreate}
       />
     </div>
   );
