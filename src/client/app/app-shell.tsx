@@ -10,9 +10,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LogOut } from "lucide-react";
+import {
+  LogOut,
+  LayoutDashboard,
+  Wallet,
+  ArrowLeftRight,
+} from "lucide-react";
+import { DashboardView } from "./views/dashboard-view";
+import { AccountsView } from "./views/accounts-view";
+import { TransactionsView } from "./views/transactions-view";
 
-type Section = "dashboard";
+type Section = "dashboard" | "accounts" | "transactions";
 type SessionBootstrap = {
   user: {
     id: string;
@@ -27,7 +35,15 @@ type ApiErrorPayload = { error?: { message?: string } };
 
 const sections: { id: Section; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
+  { id: "accounts", label: "Accounts" },
+  { id: "transactions", label: "Transactions" },
 ];
+
+const navIcons = {
+  dashboard: LayoutDashboard,
+  accounts: Wallet,
+  transactions: ArrowLeftRight,
+} as const;
 
 class SessionBootstrapError extends Error {
   readonly status: number;
@@ -203,6 +219,18 @@ export function AppShell() {
         throw new SessionBootstrapError(res.status, message);
       }
 
+      // Clear all workspace-scoped queries for the old workspace.
+      // Convention: workspace-scoped keys use [resourceName, workspaceId, ...rest].
+      const oldWorkspaceId = session.activeWorkspaceId;
+      queryClient.removeQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          return (
+            Array.isArray(key) && key.length >= 2 && key[1] === oldWorkspaceId
+          );
+        },
+      });
+
       await queryClient.refetchQueries({ queryKey: ["session"] });
     } catch (switchError) {
       if (
@@ -227,9 +255,11 @@ export function AppShell() {
     <div className="flex min-h-screen flex-col">
       <header className="border-b">
         <div className="container mx-auto flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
-            <span className="text-lg font-semibold">Money TS</span>
-            <span className="text-muted-foreground">·</span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-base font-bold tracking-tight">
+              Money<span className="font-semibold text-primary/60">TS</span>
+            </span>
+            <span className="text-muted-foreground/40">·</span>
             {session.workspaces.length > 1 ? (
               <Select
                 value={session.activeWorkspaceId}
@@ -248,47 +278,67 @@ export function AppShell() {
                 </SelectContent>
               </Select>
             ) : (
-              <span className="text-sm font-medium">
+              <span className="text-sm font-medium text-muted-foreground">
                 {activeWorkspace.name}
               </span>
             )}
-            <span className="text-muted-foreground text-xs">
-              {activeWorkspace.id}
-            </span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-muted-foreground text-sm">{userLabel}</span>
+          <div className="flex items-center gap-2">
+            <div
+              className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary"
+              title={userLabel}
+            >
+              {userLabel
+                .split(" ")
+                .map((w) => w[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase()}
+            </div>
             <Button
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               onClick={handleLogout}
               aria-label="Sign out"
             >
-              <LogOut className="size-4" />
+              <LogOut className="size-3.5" />
             </Button>
           </div>
         </div>
         <nav className="container mx-auto flex gap-1 px-4 pb-2">
-          {sections.map((s) => (
-            <Button
-              key={s.id}
-              variant={activeSection === s.id ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setActiveSection(s.id)}
-            >
-              {s.label}
-            </Button>
-          ))}
+          {sections.map((s) => {
+            const Icon = navIcons[s.id];
+            return (
+              <Button
+                key={s.id}
+                variant={activeSection === s.id ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setActiveSection(s.id)}
+                className="flex-1 sm:flex-initial"
+              >
+                <Icon className="size-4" />
+                {s.label}
+              </Button>
+            );
+          })}
         </nav>
       </header>
 
-      <main className="container mx-auto flex-1 p-4">
+      <main className="container mx-auto flex-1 px-4 py-6">
         {workspaceSwitchError ? (
           <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             {workspaceSwitchError}
           </div>
         ) : null}
-        {/* {activeSection === "dashboard" && <DashboardView />} */}
+        {activeSection === "dashboard" && (
+          <DashboardView workspaceId={session.activeWorkspaceId} />
+        )}
+        {activeSection === "accounts" && (
+          <AccountsView workspaceId={session.activeWorkspaceId} />
+        )}
+        {activeSection === "transactions" && (
+          <TransactionsView workspaceId={session.activeWorkspaceId} />
+        )}
       </main>
     </div>
   );
