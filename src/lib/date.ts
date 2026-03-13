@@ -42,6 +42,19 @@ export function currentMonthStart(): string {
 }
 
 /**
+ * First day of the next month as YYYY-MM-DD in UTC.
+ */
+export function nextMonthStart(): string {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth() + 1; // 0-indexed -> 1-indexed
+  if (month === 12) {
+    return `${year + 1}-01-01`;
+  }
+  return `${year}-${String(month + 1).padStart(2, "0")}-01`;
+}
+
+/**
  * Format a Date to YYYY-MM-DD in UTC.
  */
 export function formatDate(date: Date): string {

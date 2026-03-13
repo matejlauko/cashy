@@ -13,6 +13,7 @@ import { sessionRoute } from "@/api/routes/session";
 import { workspacesRoute } from "@/api/routes/workspaces";
 import { accountsRoute } from "@/api/routes/accounts";
 import { balanceSnapshotsRoute } from "@/api/routes/balance-snapshots";
+import { transactionsRoute } from "@/api/routes/transactions";
 
 const app = new Hono<AppEnv>().basePath("/api");
 
@@ -42,13 +43,16 @@ app.use("/accounts", sessionMiddleware, workspaceMiddleware);
 app.use("/accounts/*", sessionMiddleware, workspaceMiddleware);
 app.use("/balance-snapshots", sessionMiddleware, workspaceMiddleware);
 app.use("/balance-snapshots/*", sessionMiddleware, workspaceMiddleware);
+app.use("/transactions", sessionMiddleware, workspaceMiddleware);
+app.use("/transactions/*", sessionMiddleware, workspaceMiddleware);
 
 // ── Routes (chained for RPC type inference) ────────────────────────
 const routes = app
   .route("/session", sessionRoute)
   .route("/workspaces", workspacesRoute)
   .route("/accounts", accountsRoute)
-  .route("/balance-snapshots", balanceSnapshotsRoute);
+  .route("/balance-snapshots", balanceSnapshotsRoute)
+  .route("/transactions", transactionsRoute);
 
 export type AppType = typeof routes;
 export { routes as honoApp };

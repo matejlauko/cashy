@@ -1,33 +1,210 @@
-import { ArrowLeftRight } from "lucide-react";
+import { useState } from "react";
+import {
+  useTransactions,
+  type Transaction,
+} from "@/client/app/features/transactions/use-transactions";
+import {
+  useCreateTransaction,
+  useUpdateTransaction,
+  useSoftDeleteTransaction,
+} from "@/client/app/features/transactions/use-transaction-mutations";
+import {
+  TransactionFormDialog,
+} from "@/client/app/features/transactions/transaction-form";
+import {
+  DeleteConfirmDialog,
+} from "@/client/app/features/transactions/delete-confirm";
+import type {
+  CreateTransactionInput,
+  UpdateTransactionInput,
+} from "@/schemas/transactions";
+import { TRANSACTION_TYPE_LABELS } from "@/schemas/transactions";
+import { formatMoneyMinor } from "@/lib/money";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Plus, ArrowLeftRight, Trash2 } from "lucide-react";
 
 interface TransactionsViewProps {
   workspaceId: string;
 }
 
 export function TransactionsView({ workspaceId }: TransactionsViewProps) {
-  return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="mx-auto max-w-sm text-center">
-        <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-chart-2/10">
-          <ArrowLeftRight className="size-7 text-chart-2" />
-        </div>
-        <h2 className="text-lg font-semibold tracking-tight">Transactions</h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Log notable income and expenses to understand where your money goes
-          each month.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-            Income
-          </span>
-          <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-            Expenses
-          </span>
-          <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-            Monthly totals
-          </span>
+  const { data: transactions, isLoading, isError, error } =
+    useTransactions(workspaceId);
+
+  const createMutation = useCreateTransaction(workspaceId);
+  const updateMutation = useUpdateTransaction(workspaceId);
+  const deleteMutation = useSoftDeleteTransaction(workspaceId);
+
+  // Dialog state
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] =
+    useState<Transaction | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingTransaction, setDeletingTransaction] =
+    useState<Transaction | null>(null);
+
+  const handleCreate = () => {
+    setEditingTransaction(null);
+    setFormOpen(true);
+  };
+
+  const handleEdit = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setFormOpen(true);
+  };
+
+  const handleDeleteIntent = (transaction: Transaction) => {
+    setDeletingTransaction(transaction);
+    setDeleteOpen(true);
+  };
+
+  const handleFormSubmit = async (
+    data: CreateTransactionInput | UpdateTransactionInput,
+  ) => {
+    if (editingTransaction) {
+      await updateMutation.mutateAsync({
+        id: editingTransaction.id,
+        data: data as UpdateTransactionInput,
+      });
+    } else {
+      await createMutation.mutateAsync(data as CreateTransactionInput);
+    }
+    setFormOpen(false);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deletingTransaction) return;
+    deleteMutation.mutate(deletingTransaction.id, {
+      onSuccess: () => {
+        setDeleteOpen(false);
+        setDeletingTransaction(null);
+      },
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">
+          Loading transactions...
         </div>
       </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="text-sm text-destructive">
+          {error instanceof Error ? error.message : "Failed to load transactions"}
+        </div>
+      </div>
+    );
+  }
+
+  const hasTransactions = transactions && transactions.length > 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Transactions</h1>
+        <Button size="sm" onClick={handleCreate}>
+          <Plus className="size-4" />
+          Add Transaction
+        </Button>
+      </div>
+
+      {!hasTransactions ? (
+        <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center">
+          <div className="rounded-full bg-muted p-4">
+            <ArrowLeftRight className="size-6 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-medium">No transactions this month.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Add a transaction to track notable income and expenses.
+            </p>
+          </div>
+          <Button onClick={handleCreate}>
+            <Plus className="size-4" />
+            Add Transaction
+          </Button>
+        </div>
+      ) : (
+        <div className="divide-y rounded-lg border">
+          {transactions.map((tx) => (
+            <div
+              key={tx.id}
+              className="flex cursor-pointer items-center justify-between gap-4 p-4 transition-colors hover:bg-muted/50"
+              onClick={() => handleEdit(tx)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleEdit(tx);
+                }
+              }}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate font-medium">{tx.name}</span>
+                  <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    {TRANSACTION_TYPE_LABELS[tx.type]}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <span>{tx.transactionDate}</span>
+                  <span className="text-muted-foreground/40">&middot;</span>
+                  <span className="truncate">{tx.accountName}</span>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <span
+                  className={cn(
+                    "mr-1 text-sm font-medium tabular-nums",
+                    tx.type === "income"
+                      ? "text-emerald-600"
+                      : "text-destructive",
+                  )}
+                >
+                  {tx.type === "income" ? "+" : ""}
+                  {formatMoneyMinor(tx.signedAmount)}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteIntent(tx);
+                  }}
+                  aria-label={`Delete ${tx.name}`}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <TransactionFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        transaction={editingTransaction}
+        onSubmit={handleFormSubmit}
+        isPending={createMutation.isPending || updateMutation.isPending}
+        workspaceId={workspaceId}
+      />
+
+      <DeleteConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        transaction={deletingTransaction}
+        onConfirm={handleDeleteConfirm}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }
