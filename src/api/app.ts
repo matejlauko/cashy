@@ -11,6 +11,7 @@ import { workspaceMiddleware } from "@/api/middleware/workspace";
 
 import { sessionRoute } from "@/api/routes/session";
 import { workspacesRoute } from "@/api/routes/workspaces";
+import { accountsRoute } from "@/api/routes/accounts";
 
 const app = new Hono<AppEnv>().basePath("/api");
 
@@ -36,11 +37,14 @@ app.on(["POST", "GET"], "/auth/*", (c) => {
 // ── Protected route middleware ─────────────────────────────────────
 app.use("/session", sessionMiddleware, workspaceMiddleware);
 app.use("/workspaces/*", sessionMiddleware, workspaceMiddleware);
+app.use("/accounts", sessionMiddleware, workspaceMiddleware);
+app.use("/accounts/*", sessionMiddleware, workspaceMiddleware);
 
 // ── Routes (chained for RPC type inference) ────────────────────────
 const routes = app
   .route("/session", sessionRoute)
-  .route("/workspaces", workspacesRoute);
+  .route("/workspaces", workspacesRoute)
+  .route("/accounts", accountsRoute);
 
 export type AppType = typeof routes;
 export { routes as honoApp };
