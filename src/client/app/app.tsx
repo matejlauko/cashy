@@ -1,12 +1,16 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/client/query-client";
 import { AppShell } from "./app-shell";
 import "@/styles/globals.css";
 
 const elem = document.getElementById("root")!;
 const app = (
   <StrictMode>
-    <AppShell />
+    <QueryClientProvider client={queryClient}>
+      <AppShell />
+    </QueryClientProvider>
   </StrictMode>
 );
 

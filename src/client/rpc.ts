@@ -1,2 +1,4 @@
-// TODO: A6 - Hono RPC client
-export {};
+import { hc } from "hono/client";
+import type { AppType } from "@/api/app";
+
+export const rpc = hc<AppType>("/");
