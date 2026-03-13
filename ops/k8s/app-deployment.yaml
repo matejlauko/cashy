@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: money-ts-app
+  namespace: money-ts
+  labels:
+    app: money-ts-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: money-ts-app
+  template:
+    metadata:
+      labels:
+        app: money-ts-app
+    spec:
+      containers:
+        - name: app
+          image: money-ts-app:latest
+          ports:
+            - containerPort: 3050
+              name: http
+          envFrom:
+            - secretRef:
+                name: money-ts-app
+          env:
+            - name: PORT
+              value: "3050"
+            - name: NODE_ENV
+              value: production
+            - name: LOG_LEVEL
+              value: info
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 3050
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3050
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

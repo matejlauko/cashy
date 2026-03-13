@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: money-ts-app
+  namespace: money-ts
+  labels:
+    app: money-ts-app
+spec:
+  type: ClusterIP
+  selector:
+    app: money-ts-app
+  ports:
+    - port: 80
+      targetPort: 3050
+      protocol: TCP
+      name: http
