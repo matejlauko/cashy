@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import {
   LogOut,
   LayoutDashboard,
@@ -330,7 +331,10 @@ export function AppShell() {
                 variant={activeSection === s.id ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => handleSectionChange(s.id)}
-                className="flex-1 sm:flex-initial"
+                className={cn(
+                  "flex-1 sm:flex-initial",
+                  activeSection === s.id && "ring-1 ring-primary/20",
+                )}
               >
                 <Icon className="size-4" />
                 {s.label}

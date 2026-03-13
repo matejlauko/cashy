@@ -51,7 +51,12 @@ export function MetricCards({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <span className="text-2xl font-semibold tabular-nums">
+            <span
+              className={cn(
+                "text-2xl font-semibold tabular-nums",
+                monthlySpendingTotal < 0 && "text-muted-foreground",
+              )}
+            >
               {formatMoneyMinor(monthlySpendingTotal)}
             </span>
           </CardContent>
@@ -64,7 +69,12 @@ export function MetricCards({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <span className="text-2xl font-semibold tabular-nums">
+            <span
+              className={cn(
+                "text-2xl font-semibold tabular-nums",
+                monthlySpendingExcludingTracked < 0 && "text-muted-foreground",
+              )}
+            >
               {formatMoneyMinor(monthlySpendingExcludingTracked)}
             </span>
           </CardContent>
@@ -94,6 +104,7 @@ export function MetricCards({
           </CardHeader>
           <CardContent>
             <span className="text-lg font-semibold tabular-nums text-destructive">
+              {monthlyExpenseTotal > 0 ? "\u2212" : ""}
               {formatMoneyMinor(monthlyExpenseTotal)}
             </span>
           </CardContent>

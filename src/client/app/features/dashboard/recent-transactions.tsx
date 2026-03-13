@@ -1,5 +1,6 @@
 import type { Transaction } from "@/client/app/features/transactions/use-transactions";
 import { formatMoneyMinor } from "@/lib/money";
+import { formatDisplayDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 export type RecentTransactionsProps = {
@@ -42,7 +43,7 @@ export function RecentTransactions({
             <div className="min-w-0">
               <span className="truncate text-sm font-medium">{tx.name}</span>
               <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span>{tx.transactionDate}</span>
+                <span>{formatDisplayDate(tx.transactionDate)}</span>
                 <span className="text-muted-foreground/40">&middot;</span>
                 <span className="truncate">{tx.accountName}</span>
               </div>

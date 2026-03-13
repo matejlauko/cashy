@@ -1,19 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { rpc } from "@/client/rpc";
+import { parseApiError } from "@/client/app/lib/api-error";
 import type { BulkBalanceUpdateInput } from "@/schemas/balance-snapshots";
-
-type ApiError = { error: { code: string; message: string } };
-
-async function parseApiError(res: Response): Promise<ApiError["error"]> {
-  try {
-    const body = (await res.json()) as ApiError;
-    if (body.error?.message) return body.error;
-  } catch {
-    // ignore
-  }
-  return { code: "UNKNOWN", message: "An unexpected error occurred" };
-}
 
 export function useBulkBalanceUpdate(workspaceId: string) {
   const queryClient = useQueryClient();

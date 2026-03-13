@@ -55,6 +55,23 @@ export function nextMonthStart(): string {
 }
 
 /**
+ * Format a YYYY-MM-DD string for display: "Mar 12" (current year) or "Mar 12, 2025" (other years).
+ */
+export function formatDisplayDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  if (!year || !month || !day) return dateStr;
+
+  const isCurrentYear = year === new Date().getUTCFullYear();
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(isCurrentYear ? {} : { year: "numeric" }),
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+/**
  * Format a Date to YYYY-MM-DD in UTC.
  */
 export function formatDate(date: Date): string {

@@ -20,6 +20,7 @@ import type {
 } from "@/schemas/transactions";
 import { TRANSACTION_TYPE_LABELS } from "@/schemas/transactions";
 import { formatMoneyMinor } from "@/lib/money";
+import { formatDisplayDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Plus, ArrowLeftRight, Trash2 } from "lucide-react";
@@ -103,9 +104,21 @@ export function TransactionsView({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">
-          Loading transactions...
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="h-6 w-28 animate-pulse rounded bg-muted" />
+          <div className="h-8 w-32 animate-pulse rounded bg-muted" />
+        </div>
+        <div className="divide-y rounded-lg border">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-4 p-4">
+              <div className="space-y-2">
+                <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+                <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+              </div>
+              <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -173,7 +186,7 @@ export function TransactionsView({
                   </span>
                 </div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <span>{tx.transactionDate}</span>
+                  <span>{formatDisplayDate(tx.transactionDate)}</span>
                   <span className="text-muted-foreground/40">&middot;</span>
                   <span className="truncate">{tx.accountName}</span>
                 </div>
@@ -192,14 +205,14 @@ export function TransactionsView({
                 </span>
                 <Button
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDeleteIntent(tx);
                   }}
                   aria-label={`Delete ${tx.name}`}
                 >
-                  <Trash2 className="size-3.5" />
+                  <Trash2 className="size-4" />
                 </Button>
               </div>
             </div>

@@ -16,6 +16,7 @@ import type {
   UpdateAccountInput,
 } from "@/schemas/accounts";
 import { ACCOUNT_TYPE_LABELS } from "@/schemas/accounts";
+import type { AppError } from "@/client/app/lib/api-error";
 import { formatMoneyMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -80,12 +81,33 @@ export function AccountsView({ workspaceId }: AccountsViewProps) {
     });
   };
 
-  // Loading state
   if (isLoading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">
-          Loading accounts...
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="h-6 w-24 animate-pulse rounded bg-muted" />
+          <div className="flex gap-2">
+            <div className="h-8 w-32 animate-pulse rounded bg-muted" />
+            <div className="h-8 w-28 animate-pulse rounded bg-muted" />
+          </div>
+        </div>
+        <div className="divide-y rounded-lg border">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-4 p-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+                  <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />
+                </div>
+                <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+                <div className="size-9 animate-pulse rounded bg-muted" />
+                <div className="size-9 animate-pulse rounded bg-muted" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -172,19 +194,19 @@ export function AccountsView({ workspaceId }: AccountsViewProps) {
                 </span>
                 <Button
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon"
                   onClick={() => handleEdit(account)}
                   aria-label={`Edit ${account.name}`}
                 >
-                  <Pencil className="size-3.5" />
+                  <Pencil className="size-4" />
                 </Button>
                 <Button
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon"
                   onClick={() => handleArchiveIntent(account)}
                   aria-label={`Archive ${account.name}`}
                 >
-                  <Archive className="size-3.5" />
+                  <Archive className="size-4" />
                 </Button>
               </div>
             </div>
@@ -201,10 +223,19 @@ export function AccountsView({ workspaceId }: AccountsViewProps) {
       />
       <ArchiveConfirmDialog
         open={archiveOpen}
-        onOpenChange={setArchiveOpen}
+        onOpenChange={(open) => {
+          setArchiveOpen(open);
+          if (!open) archiveMutation.reset();
+        }}
         account={archivingAccount}
         onConfirm={handleArchiveConfirm}
         isPending={archiveMutation.isPending}
+        error={
+          (archiveMutation.error as AppError | null)?.code ===
+          "ACCOUNT_BALANCE_NOT_ZERO"
+            ? archiveMutation.error?.message ?? null
+            : null
+        }
       />
       <BalanceUpdateFormDialog
         open={balanceUpdateOpen}

@@ -16,6 +16,7 @@ export interface ArchiveConfirmDialogProps {
   account: Account | null;
   onConfirm: () => void;
   isPending: boolean;
+  error?: string | null;
 }
 
 export function ArchiveConfirmDialog({
@@ -24,6 +25,7 @@ export function ArchiveConfirmDialog({
   account,
   onConfirm,
   isPending,
+  error,
 }: ArchiveConfirmDialogProps) {
   if (!account) return null;
 
@@ -38,6 +40,14 @@ export function ArchiveConfirmDialog({
             zero balance to be archived.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {error && (
+          <p className="text-sm text-destructive">
+            {error}{" "}
+            <span className="text-muted-foreground">
+              Update the balance to zero before archiving.
+            </span>
+          </p>
+        )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction

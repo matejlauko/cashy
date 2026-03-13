@@ -168,6 +168,7 @@ export function BalanceUpdateFormDialog({
               />
             </div>
 
+            <div className="max-h-[60vh] overflow-y-auto">
             <div className="grid gap-3">
               {accounts.map((account) => {
                 const isCreditCard = account.accountType === "credit_card";
@@ -208,6 +209,7 @@ export function BalanceUpdateFormDialog({
                   </div>
                 );
               })}
+            </div>
             </div>
 
             {formError && (

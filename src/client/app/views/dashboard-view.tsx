@@ -43,9 +43,33 @@ export function DashboardView({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">
-          Loading dashboard...
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2 rounded-xl border p-6">
+                <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+                <div className="h-7 w-28 animate-pulse rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2].map((i) => (
+              <div key={i} className="space-y-2 rounded-xl border p-6">
+                <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+                <div className="h-6 w-24 animate-pulse rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+          <div className="h-[250px] animate-pulse rounded-lg border bg-muted/30" />
+        </div>
+        <div className="flex gap-2">
+          <div className="h-9 w-36 animate-pulse rounded bg-muted" />
+          <div className="h-8 w-28 animate-pulse rounded bg-muted" />
+          <div className="h-8 w-32 animate-pulse rounded bg-muted" />
         </div>
       </div>
     );
@@ -133,27 +157,29 @@ export function DashboardView({
       {chartData.length > 0 && <BalanceChart data={chartData} />}
 
       {/* Primary CTA */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={() => setBalanceUpdateOpen(true)}>
+      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+        <Button onClick={() => setBalanceUpdateOpen(true)} className="w-full sm:w-auto">
           <RefreshCw className="size-4" />
           Update Balances
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onNavigate?.("accounts")}
-        >
-          <Plus className="size-4" />
-          Add Account
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onNavigate?.("transactions")}
-        >
-          <ArrowLeftRight className="size-4" />
-          Add Transaction
-        </Button>
+        <div className="grid grid-cols-2 gap-2 sm:contents">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onNavigate?.("accounts")}
+          >
+            <Plus className="size-4" />
+            Add Account
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onNavigate?.("transactions")}
+          >
+            <ArrowLeftRight className="size-4" />
+            Add Transaction
+          </Button>
+        </div>
       </div>
 
       <AccountBalances accounts={accountBalances} />

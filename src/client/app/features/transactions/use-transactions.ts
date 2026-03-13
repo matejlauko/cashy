@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { rpc } from "@/client/rpc";
+import { currentMonthStart } from "@/lib/date";
 
 export type Transaction = {
   id: string;
@@ -15,8 +16,10 @@ export type Transaction = {
 };
 
 export function useTransactions(workspaceId: string) {
+  const monthStart = currentMonthStart();
+
   return useQuery({
-    queryKey: ["transactions", workspaceId],
+    queryKey: ["transactions", workspaceId, monthStart],
     queryFn: async () => {
       const res = await rpc.api.transactions.$get();
       if (!res.ok) {

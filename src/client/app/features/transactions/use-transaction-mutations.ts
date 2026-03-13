@@ -1,34 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { rpc } from "@/client/rpc";
+import { parseApiError, type AppError } from "@/client/app/lib/api-error";
+import { currentMonthStart } from "@/lib/date";
 import type {
   CreateTransactionInput,
   UpdateTransactionInput,
 } from "@/schemas/transactions";
-
-type ApiError = { error: { code: string; message: string } };
-type AppError = Error & { code?: string };
-
-async function parseApiError(res: Response): Promise<ApiError["error"]> {
-  try {
-    const body = (await res.json()) as {
-      error?: { code?: string; message?: string };
-      message?: string;
-    };
-    if (body.error?.message) {
-      return {
-        code: body.error.code ?? `HTTP_${res.status}`,
-        message: body.error.message,
-      };
-    }
-    if (typeof body.message === "string" && body.message.trim().length > 0) {
-      return { code: `HTTP_${res.status}`, message: body.message };
-    }
-  } catch {
-    // ignore
-  }
-  return { code: "UNKNOWN", message: "An unexpected error occurred" };
-}
 
 export function useCreateTransaction(workspaceId: string) {
   const queryClient = useQueryClient();
@@ -43,8 +21,9 @@ export function useCreateTransaction(workspaceId: string) {
       return res.json();
     },
     onSuccess: () => {
+      const monthStart = currentMonthStart();
       queryClient.invalidateQueries({
-        queryKey: ["transactions", workspaceId],
+        queryKey: ["transactions", workspaceId, monthStart],
       });
       queryClient.invalidateQueries({
         queryKey: ["dashboard", workspaceId],
@@ -84,8 +63,9 @@ export function useUpdateTransaction(workspaceId: string) {
       return res.json();
     },
     onSuccess: () => {
+      const monthStart = currentMonthStart();
       queryClient.invalidateQueries({
-        queryKey: ["transactions", workspaceId],
+        queryKey: ["transactions", workspaceId, monthStart],
       });
       queryClient.invalidateQueries({
         queryKey: ["dashboard", workspaceId],
@@ -116,8 +96,9 @@ export function useSoftDeleteTransaction(workspaceId: string) {
       return res.json();
     },
     onSuccess: () => {
+      const monthStart = currentMonthStart();
       queryClient.invalidateQueries({
-        queryKey: ["transactions", workspaceId],
+        queryKey: ["transactions", workspaceId, monthStart],
       });
       queryClient.invalidateQueries({
         queryKey: ["dashboard", workspaceId],

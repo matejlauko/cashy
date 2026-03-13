@@ -1,20 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { rpc } from "@/client/rpc";
+import { parseApiError, type AppError } from "@/client/app/lib/api-error";
 import type { CreateAccountInput, UpdateAccountInput } from "@/schemas/accounts";
-
-type ApiError = { error: { code: string; message: string } };
-type AppError = Error & { code?: string };
-
-async function parseApiError(res: Response): Promise<ApiError["error"]> {
-  try {
-    const body = (await res.json()) as ApiError;
-    if (body.error?.message) return body.error;
-  } catch {
-    // ignore
-  }
-  return { code: "UNKNOWN", message: "An unexpected error occurred" };
-}
 
 export function useCreateAccount(workspaceId: string) {
   const queryClient = useQueryClient();
@@ -108,7 +96,10 @@ export function useArchiveAccount(workspaceId: string) {
       });
       toast.success("Account archived");
     },
-    onError: (err: Error) => {
+    onError: (err: AppError) => {
+      if (err.code === "ACCOUNT_BALANCE_NOT_ZERO") {
+        return;
+      }
       toast.error(err.message);
     },
   });
