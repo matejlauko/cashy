@@ -2,7 +2,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { rpc } from "@/client/rpc";
 import { parseApiError, type AppError } from "@/client/app/lib/api-error";
-import type { CreateAccountInput, UpdateAccountInput } from "@/schemas/accounts";
+import type {
+  CreateAccountInput,
+  UpdateAccountInput,
+} from "@/schemas/accounts";
 
 export function useCreateAccount(workspaceId: string) {
   const queryClient = useQueryClient();
@@ -45,10 +48,10 @@ export function useUpdateAccount(workspaceId: string) {
       id: string;
       data: UpdateAccountInput;
     }) => {
-      const res = await fetch(`/api/accounts/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+      const res = await rpc.api.accounts[":id"].$patch({
+        param: { id },
+        // @ts-expect-error - TODO: fix this
+        json: data,
       });
       if (!res.ok) {
         const err = await parseApiError(res);

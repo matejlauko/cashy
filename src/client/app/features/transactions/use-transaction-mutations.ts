@@ -51,10 +51,10 @@ export function useUpdateTransaction(workspaceId: string) {
       id: string;
       data: UpdateTransactionInput;
     }) => {
-      const res = await fetch(`/api/transactions/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+      const res = await rpc.api.transactions[":id"].$patch({
+        param: { id },
+        // @ts-expect-error - TODO: fix this
+        json: data,
       });
       if (!res.ok) {
         const err = await parseApiError(res);
