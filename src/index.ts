@@ -17,7 +17,7 @@ server = Bun.serve({
     // Public / and /login go through fetch() with auth checks below.
     // "/_app": index,
     // "/_login": login,
-    "/app": index,
+    "/": index,
     "/login": login,
 
     "/healthz": new Response("OK"),
