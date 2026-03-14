@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useDashboard } from "@/client/app/features/dashboard/use-dashboard";
 import { MetricCards } from "@/client/app/features/dashboard/metric-cards";
-import { BalanceChart } from "@/client/app/features/dashboard/balance-chart";
+// import { BalanceChart } from "@/client/app/features/dashboard/balance-chart";
 import { AccountBalances } from "@/client/app/features/dashboard/account-balances";
 import { RecentTransactions } from "@/client/app/features/dashboard/recent-transactions";
 import { BalanceUpdateFormDialog } from "@/client/app/features/balance-snapshots/balance-update-form";
@@ -154,7 +154,7 @@ export function DashboardView({
         monthlyExpenseTotal={summary.monthlyExpenseTotal}
       />
 
-      {chartData.length > 0 && <BalanceChart data={chartData} />}
+      {/* {chartData.length > 0 && <BalanceChart data={chartData} />} */}
 
       {/* Primary CTA */}
       <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
