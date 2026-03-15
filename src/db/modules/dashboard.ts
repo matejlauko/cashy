@@ -1,6 +1,6 @@
 import { sql } from "@/db/client";
 import { bigintToSafeNumber } from "@/lib/money";
-import { today, currentMonthStart, nextMonthStart } from "@/lib/date";
+import { monthStartFromKey, monthEndFromKey } from "@/lib/date";
 
 // ─── Return types ────────────────────────────────────────────────────────────
 
@@ -36,10 +36,11 @@ export type ChartDataPoint = {
 
 export async function getDashboardSummary(
   workspaceId: string,
+  monthKey: string,
+  asOfDate: string,
 ): Promise<DashboardSummary> {
-  const todayDate = today();
-  const monthStart = currentMonthStart();
-  const monthEnd = nextMonthStart();
+  const monthStart = monthStartFromKey(monthKey);
+  const monthEnd = monthEndFromKey(monthKey);
 
   const rows = await sql`
     WITH latest_balances AS (
@@ -57,7 +58,7 @@ export async function getDashboardSummary(
         FROM balance_snapshot bs
         WHERE bs.financial_account_id = fa.id
           AND bs.workspace_id = fa.workspace_id
-          AND bs.effective_date <= ${todayDate}
+          AND bs.effective_date <= ${asOfDate}
         ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
         LIMIT 1
       ) latest ON true
@@ -152,16 +153,17 @@ export async function getDashboardSummary(
 
 export async function getBalanceChartData(
   workspaceId: string,
+  monthKey: string,
+  asOfDate: string,
 ): Promise<ChartDataPoint[]> {
-  const todayDate = today();
-  const monthStart = currentMonthStart();
+  const monthStart = monthStartFromKey(monthKey);
 
   const rows = await sql`
     WITH date_series AS (
       SELECT d::date AS chart_date
       FROM generate_series(
         ${monthStart}::date,
-        ${todayDate}::date,
+        ${asOfDate}::date,
         '1 day'::interval
       ) AS d
     ),

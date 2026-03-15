@@ -1,6 +1,12 @@
 import { sql } from "@/db/client";
 import { bigintToSafeNumber } from "@/lib/money";
-import { today, currentMonthStart, nextMonthStart } from "@/lib/date";
+import {
+  today,
+  currentMonthStart,
+  nextMonthStart,
+  monthStartFromKey,
+  monthEndFromKey,
+} from "@/lib/date";
 import type {
   CreateTransactionInput,
   UpdateTransactionInput,
@@ -92,9 +98,10 @@ export async function listCurrentMonth(
 export async function listRecent(
   workspaceId: string,
   limit: number,
+  monthKey: string,
 ): Promise<TransactionRow[]> {
-  const monthStart = currentMonthStart();
-  const monthEnd = nextMonthStart();
+  const monthStart = monthStartFromKey(monthKey);
+  const monthEnd = monthEndFromKey(monthKey);
 
   const rows = await sql`
     SELECT

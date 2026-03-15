@@ -80,3 +80,54 @@ export function formatDate(date: Date): string {
   const d = String(date.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+// ─── Month-key helpers (YYYY-MM format) ─────────────────────────────────────
+
+const MONTH_KEY_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+export function isMonthKey(value: string): boolean {
+  return MONTH_KEY_RE.test(value);
+}
+
+export function currentMonthKey(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function monthStartFromKey(key: string): string {
+  return `${key}-01`;
+}
+
+export function monthEndFromKey(key: string): string {
+  const [year, month] = key.split("-").map(Number) as [number, number];
+  if (month === 12) return `${year + 1}-01-01`;
+  return `${year}-${String(month + 1).padStart(2, "0")}-01`;
+}
+
+export function lastDayOfMonthFromKey(key: string): string {
+  const [year, month] = key.split("-").map(Number) as [number, number];
+  // Day 0 of the next month = last day of this month
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${key}-${String(lastDay).padStart(2, "0")}`;
+}
+
+export function prevMonthKey(key: string): string {
+  const [year, month] = key.split("-").map(Number) as [number, number];
+  if (month === 1) return `${year - 1}-12`;
+  return `${year}-${String(month - 1).padStart(2, "0")}`;
+}
+
+export function nextMonthKey(key: string): string {
+  const [year, month] = key.split("-").map(Number) as [number, number];
+  if (month === 12) return `${year + 1}-01`;
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
+
+export function formatMonthLabel(key: string): string {
+  const [year, month] = key.split("-").map(Number) as [number, number];
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
+}

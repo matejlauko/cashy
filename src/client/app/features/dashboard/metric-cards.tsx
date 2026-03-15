@@ -15,6 +15,7 @@ export type MetricCardsProps = {
   monthlyExpenseTotal: number;
   recurringIncomeTotal: number;
   recurringExpenseTotal: number;
+  isCurrentMonth?: boolean;
 };
 
 export function MetricCards({
@@ -25,6 +26,7 @@ export function MetricCards({
   monthlyExpenseTotal,
   recurringIncomeTotal,
   recurringExpenseTotal,
+  isCurrentMonth = true,
 }: MetricCardsProps) {
   return (
     <div className="space-y-3">
@@ -33,7 +35,7 @@ export function MetricCards({
         <Card>
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Current Balance
+              {isCurrentMonth ? "Current Balance" : "Balance"}
             </CardTitle>
           </CardHeader>
           <CardContent>

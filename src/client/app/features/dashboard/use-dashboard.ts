@@ -25,13 +25,16 @@ export type DashboardData = {
   chartData: ChartDataPoint[];
   accountBalances: Account[];
   recentTransactions: Transaction[];
+  isCurrentMonth: boolean;
 };
 
-export function useDashboard(workspaceId: string) {
+export function useDashboard(workspaceId: string, month: string) {
   return useQuery({
-    queryKey: ["dashboard", workspaceId],
+    queryKey: ["dashboard", workspaceId, month],
     queryFn: async () => {
-      const res = await rpc.api.dashboard.$get();
+      const res = await rpc.api.dashboard.$get({
+        query: { month },
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         const message =

@@ -94,6 +94,41 @@ export async function listActive(workspaceId: string): Promise<AccountRow[]> {
   return rows.map(mapAccountRow);
 }
 
+export async function listActiveAsOf(
+  workspaceId: string,
+  asOfDate: string,
+): Promise<AccountRow[]> {
+  const rows = await sql`
+    SELECT
+      fa.id,
+      fa.name,
+      fa.institution_name,
+      fa.type,
+      fa.created_at,
+      fa.updated_at,
+      COALESCE(
+        CASE WHEN fa.type = 'credit_card' THEN -latest.amount_minor_raw
+             ELSE latest.amount_minor_raw
+        END,
+        0
+      ) AS current_balance
+    FROM financial_account fa
+    LEFT JOIN LATERAL (
+      SELECT bs.amount_minor_raw
+      FROM balance_snapshot bs
+      WHERE bs.financial_account_id = fa.id
+        AND bs.workspace_id = fa.workspace_id
+        AND bs.effective_date <= ${asOfDate}
+      ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
+      LIMIT 1
+    ) latest ON true
+    WHERE fa.workspace_id = ${workspaceId}
+      AND fa.archived_at IS NULL
+    ORDER BY fa.name ASC
+  `;
+  return rows.map(mapAccountRow);
+}
+
 export async function listArchived(
   workspaceId: string,
 ): Promise<ArchivedAccountRow[]> {

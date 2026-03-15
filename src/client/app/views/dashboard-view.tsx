@@ -4,8 +4,9 @@ import { MetricCards } from "@/client/app/features/dashboard/metric-cards";
 // import { BalanceChart } from "@/client/app/features/dashboard/balance-chart";
 import { AccountBalances } from "@/client/app/features/dashboard/account-balances";
 import { RecentTransactions } from "@/client/app/features/dashboard/recent-transactions";
+import { MonthNavigator } from "@/client/app/features/dashboard/month-navigator";
 import { BalanceUpdateFormDialog } from "@/client/app/features/balance-snapshots/balance-update-form";
-import { currentMonthStart } from "@/lib/date";
+import { currentMonthKey, monthStartFromKey } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import {
   Wallet,
@@ -38,12 +39,14 @@ export function DashboardView({
   onNavigate,
   onEditTransaction,
 }: DashboardViewProps) {
-  const { data, isLoading, isError, error } = useDashboard(workspaceId);
+  const [month, setMonth] = useState(currentMonthKey());
+  const { data, isLoading, isError, error } = useDashboard(workspaceId, month);
   const [balanceUpdateOpen, setBalanceUpdateOpen] = useState(false);
 
   if (isLoading) {
     return (
       <div className="space-y-6">
+        <MonthNavigator month={month} onChange={setMonth} />
         <div className="space-y-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[1, 2, 3].map((i) => (
@@ -77,9 +80,12 @@ export function DashboardView({
 
   if (isError) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="text-sm text-destructive">
-          {error instanceof Error ? error.message : "Failed to load dashboard"}
+      <div className="space-y-6">
+        <MonthNavigator month={month} onChange={setMonth} />
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="text-sm text-destructive">
+            {error instanceof Error ? error.message : "Failed to load dashboard"}
+          </div>
         </div>
       </div>
     );
@@ -87,63 +93,71 @@ export function DashboardView({
 
   if (!data) return null;
 
-  const { summary, chartData, accountBalances, recentTransactions } = data;
+  const { summary, chartData, accountBalances, recentTransactions, isCurrentMonth } = data;
   const hasAccounts = accountBalances.length > 0;
-  const monthStart = currentMonthStart();
-  const hasCurrentMonthSnapshot =
+  const monthStart = monthStartFromKey(month);
+  const hasMonthSnapshot =
     summary.lastSnapshotDate !== null && summary.lastSnapshotDate >= monthStart;
   const hasTransactions = recentTransactions.length > 0;
 
-  // No accounts — full empty state
-  if (!hasAccounts) {
+  // No accounts — full empty state (only for current month)
+  if (!hasAccounts && isCurrentMonth) {
     return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center">
-        <div className="rounded-full bg-muted p-4">
-          <Wallet className="size-6 text-muted-foreground" />
+      <div className="space-y-6">
+        <MonthNavigator month={month} onChange={setMonth} />
+        <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center">
+          <div className="rounded-full bg-muted p-4">
+            <Wallet className="size-6 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-medium">Create your first account</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Add an account to start tracking your balances and spending.
+            </p>
+          </div>
+          <Button onClick={() => onNavigate?.("accounts")}>
+            <Plus className="size-4" />
+            Create Account
+          </Button>
         </div>
-        <div>
-          <p className="font-medium">Create your first account</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Add an account to start tracking your balances and spending.
-          </p>
-        </div>
-        <Button onClick={() => onNavigate?.("accounts")}>
-          <Plus className="size-4" />
-          Create Account
-        </Button>
       </div>
     );
   }
 
-  // Has accounts but no snapshots in the current month
-  if (!hasCurrentMonthSnapshot) {
+  // Has accounts but no snapshots — only block for current month
+  if (isCurrentMonth && !hasMonthSnapshot) {
     return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center">
-        <div className="rounded-full bg-muted p-4">
-          <BarChart3 className="size-6 text-muted-foreground" />
+      <div className="space-y-6">
+        <MonthNavigator month={month} onChange={setMonth} />
+        <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center">
+          <div className="rounded-full bg-muted p-4">
+            <BarChart3 className="size-6 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-medium">Update your balances to see spending data</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Enter this month's balances to populate current spending metrics.
+            </p>
+          </div>
+          <Button onClick={() => setBalanceUpdateOpen(true)}>
+            <RefreshCw className="size-4" />
+            Update Balances
+          </Button>
+          <BalanceUpdateFormDialog
+            open={balanceUpdateOpen}
+            onOpenChange={setBalanceUpdateOpen}
+            workspaceId={workspaceId}
+            onCreateAccount={() => onNavigate?.("accounts")}
+          />
         </div>
-        <div>
-          <p className="font-medium">Update your balances to see spending data</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Enter this month's balances to populate current spending metrics.
-          </p>
-        </div>
-        <Button onClick={() => setBalanceUpdateOpen(true)}>
-          <RefreshCw className="size-4" />
-          Update Balances
-        </Button>
-        <BalanceUpdateFormDialog
-          open={balanceUpdateOpen}
-          onOpenChange={setBalanceUpdateOpen}
-          workspaceId={workspaceId}
-          onCreateAccount={() => onNavigate?.("accounts")}
-        />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      <MonthNavigator month={month} onChange={setMonth} />
+
       <MetricCards
         currentBalance={summary.currentBalance}
         monthlySpendingTotal={summary.monthlySpendingTotal}
@@ -154,35 +168,38 @@ export function DashboardView({
         monthlyExpenseTotal={summary.monthlyExpenseTotal}
         recurringIncomeTotal={summary.recurringIncomeTotal}
         recurringExpenseTotal={summary.recurringExpenseTotal}
+        isCurrentMonth={isCurrentMonth}
       />
 
       {/* {chartData.length > 0 && <BalanceChart data={chartData} />} */}
 
-      {/* Primary CTA */}
-      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
-        <Button onClick={() => setBalanceUpdateOpen(true)} className="w-full sm:w-auto">
-          <RefreshCw className="size-4" />
-          Update Balances
-        </Button>
-        <div className="grid grid-cols-2 gap-2 sm:contents">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onNavigate?.("accounts")}
-          >
-            <Plus className="size-4" />
-            Add Account
+      {/* Primary CTA — only for current month */}
+      {isCurrentMonth && (
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <Button onClick={() => setBalanceUpdateOpen(true)} className="w-full sm:w-auto">
+            <RefreshCw className="size-4" />
+            Update Balances
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onNavigate?.("transactions")}
-          >
-            <ArrowLeftRight className="size-4" />
-            Add Transaction
-          </Button>
+          <div className="grid grid-cols-2 gap-2 sm:contents">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigate?.("accounts")}
+            >
+              <Plus className="size-4" />
+              Add Account
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigate?.("transactions")}
+            >
+              <ArrowLeftRight className="size-4" />
+              Add Transaction
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <AccountBalances accounts={accountBalances} />
 
@@ -194,19 +211,25 @@ export function DashboardView({
               ? onEditTransaction(transactionId)
               : onNavigate?.("transactions")
           }
+          isCurrentMonth={isCurrentMonth}
         />
       ) : (
         <div className="rounded-lg border px-4 py-6 text-center">
           <p className="text-sm text-muted-foreground">
-            No transactions this month.{" "}
-            <button
-              type="button"
-              className="font-medium text-primary underline-offset-4 hover:underline"
-              onClick={() => onNavigate?.("transactions")}
-            >
-              Add a transaction
-            </button>{" "}
-            to track notable expenses.
+            No transactions this month.
+            {isCurrentMonth && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                  onClick={() => onNavigate?.("transactions")}
+                >
+                  Add a transaction
+                </button>{" "}
+                to track notable expenses.
+              </>
+            )}
           </p>
         </div>
       )}
@@ -218,12 +241,14 @@ export function DashboardView({
         </p>
       )}
 
-      <BalanceUpdateFormDialog
-        open={balanceUpdateOpen}
-        onOpenChange={setBalanceUpdateOpen}
-        workspaceId={workspaceId}
-        onCreateAccount={() => onNavigate?.("accounts")}
-      />
+      {isCurrentMonth && (
+        <BalanceUpdateFormDialog
+          open={balanceUpdateOpen}
+          onOpenChange={setBalanceUpdateOpen}
+          workspaceId={workspaceId}
+          onCreateAccount={() => onNavigate?.("accounts")}
+        />
+      )}
     </div>
   );
 }

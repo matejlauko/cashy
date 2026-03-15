@@ -6,16 +6,18 @@ import { cn } from "@/lib/utils";
 export type RecentTransactionsProps = {
   transactions: Transaction[];
   onEdit?: (id: string) => void;
+  isCurrentMonth?: boolean;
 };
 
 export function RecentTransactions({
   transactions,
   onEdit,
+  isCurrentMonth = true,
 }: RecentTransactionsProps) {
   return (
     <div className="space-y-3">
       <h2 className="text-sm font-semibold text-muted-foreground">
-        Recent Transactions
+        {isCurrentMonth ? "Recent Transactions" : "Transactions"}
       </h2>
       <div className="divide-y rounded-lg border">
         {transactions.map((tx) => (
