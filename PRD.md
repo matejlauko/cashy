@@ -8,7 +8,7 @@ V1 is intentionally narrow:
 
 - Manual account balance snapshots are the source of truth.
 - Manual transactions add context and help explain spending, but do not change balances.
-- The dashboard focuses on the current calendar month only.
+- The dashboard defaults to the current calendar month and supports browsing previous months.
 - The product is designed for one household now, while leaving room for one user to belong to multiple workspaces later.
 
 This document covers the product scope and UX only. Technical implementation choices are intentionally deferred.
@@ -50,7 +50,6 @@ The current approach is manual by design. Users will regularly enter account bal
 - User profile management beyond sign in and logout
 - Role-based permissions
 - Alerts for stale balance updates
-- Historical month browsing
 - Pagination, advanced filtering, or search
 - Native mobile apps
 
@@ -80,7 +79,7 @@ Transactions help explain income and major expenses, but they do not mutate acco
 
 ### 3. Current Month First
 
-The dashboard and lists should optimize for the current month only. Older data may exist, but V1 does not provide month browsing.
+The dashboard defaults to the current month and optimizes for it. Users can browse previous months via left/right arrow navigation, but the current month remains the primary view.
 
 ### 4. Shared but Simple
 
@@ -98,7 +97,7 @@ Historical records should remain intact even when accounts or transactions are h
 - Preconfigured users and workspace memberships
 - Multiple workspaces supported in the model
 - One user potentially belonging to multiple workspaces in the future
-- Dashboard for current-month metrics
+- Dashboard for current-month metrics with month navigation to browse previous months
 - Account creation, editing, and archiving
 - Bulk account balance update flow
 - Manual transaction creation, editing, and soft deletion
@@ -116,7 +115,7 @@ Historical records should remain intact even when accounts or transactions are h
 - Any reconciliation workflow
 - Any transaction categories or tags
 - Any import/export workflow
-- Any historical reporting beyond current-month dashboard calculations
+- Any historical reporting beyond month-level dashboard browsing
 
 ## 8. Core Concepts and Business Rules
 
@@ -246,12 +245,12 @@ Rules:
 
 - Archived accounts should still appear in historical chart calculations and old references.
 - Soft-deleted transactions should not appear in default transaction lists.
-- V1 does not provide a dedicated historical browsing surface outside the current month.
+- The dashboard supports month-by-month browsing via left/right arrow navigation. Action buttons (Update Balances, Add Account, Add Transaction) are shown only for the current month.
 - Past-dated entries may still affect current-month calculations when relevant, especially for opening balance.
 
 ## 9. Metric Definitions
 
-All dashboard math uses stored business dates (`date` fields) only.
+All dashboard math uses stored business dates (`date` fields) only. All metrics are computed relative to the selected month on the dashboard. When no month is specified, the current calendar month is used.
 
 For V1:
 
@@ -396,6 +395,7 @@ Supporting content:
 - Total balance over time chart for the current month
 - Per-account current balances for active accounts
 - Recent transactions list
+- Month navigation with left/right arrows, defaulting to the current month
 - Last balance snapshot date for trust/context
 
 #### Required Actions
@@ -418,6 +418,7 @@ Secondary actions:
 - KPI cards first
 - Chart directly beneath primary numbers
 - Account balances and recent transactions visible without deep navigation
+- Month navigation controls at the top of the dashboard content area
 - The screen should feel calm, modern, and low-noise rather than dense
 
 #### Recent Transactions on Dashboard
@@ -660,7 +661,16 @@ Requirements:
 4. Transaction appears in recent/current-month transaction lists.
 5. Dashboard transaction totals and derived spending figures refresh if applicable.
 
-### 12.5 Archive an Old Account
+### 12.5 Browse a Previous Month
+
+1. User opens dashboard (defaults to current month).
+2. User clicks the left arrow next to the month label.
+3. Dashboard updates to show the previous month's metrics, account balances, and transactions.
+4. Action buttons (Update Balances, Add Account, Add Transaction) are hidden for past months.
+5. User clicks the right arrow to return to the current month.
+6. Right arrow is disabled when viewing the current month.
+
+### 12.6 Archive an Old Account
 
 1. User opens account edit/details.
 2. User confirms the account’s current effective balance is `0`.
@@ -668,7 +678,7 @@ Requirements:
 4. Account disappears from active lists and future update forms.
 5. Historical chart calculations and old references remain intact.
 
-### 12.6 Add a Recurring Transaction
+### 12.7 Add a Recurring Transaction
 
 1. User navigates to the Recurring section.
 2. User taps/clicks `Add Recurring`.
@@ -677,7 +687,7 @@ Requirements:
 5. Recurring transaction appears in the active list.
 6. Dashboard recurring totals update to reflect the new item.
 
-### 12.7 Archive a Recurring Transaction
+### 12.8 Archive a Recurring Transaction
 
 1. User navigates to the Recurring section.
 2. User clicks the archive button on a recurring transaction.
@@ -745,8 +755,8 @@ These are product requirements, not implementation details.
 ## 15. Product Decisions and Assumptions Locked for V1
 
 - Budget functionality is removed from V1 entirely.
-- Current-month dashboarding is the only reporting surface in V1.
-- Users may enter past dates for backfill, even though the app does not offer past-month browsing.
+- The dashboard supports month-by-month browsing. Future months are not navigable.
+- Users may enter past dates for backfill.
 - If no balance exists before the current month, the opening balance contribution is `0`.
 - Bulk balance save always writes a full snapshot for all active accounts shown, even when unchanged.
 - Multiple same-day balance updates are allowed; latest save timestamp wins.
@@ -773,7 +783,7 @@ The MVP is successful if:
 ## 17. Future Expansion Opportunities (Explicitly Deferred)
 
 - Budgets and remaining budget
-- Month browsing and historical reports
+- Historical reports and trends beyond month-level dashboard
 - Transaction categories
 - Transfers between own accounts
 - Search and filters

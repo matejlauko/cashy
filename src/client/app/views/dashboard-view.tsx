@@ -6,7 +6,7 @@ import { AccountBalances } from "@/client/app/features/dashboard/account-balance
 import { RecentTransactions } from "@/client/app/features/dashboard/recent-transactions";
 import { MonthNavigator } from "@/client/app/features/dashboard/month-navigator";
 import { BalanceUpdateFormDialog } from "@/client/app/features/balance-snapshots/balance-update-form";
-import { currentMonthKey, monthStartFromKey } from "@/lib/date";
+import { currentMonthKey, monthStartFromKey, formatDisplayDate } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import {
   Wallet,
@@ -22,17 +22,6 @@ interface DashboardViewProps {
   onEditTransaction?: (transactionId: string) => void;
 }
 
-function formatSnapshotDate(date: string): string {
-  const [year, month, day] = date.split("-").map(Number);
-  if (!year || !month || !day) return date;
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, day)));
-}
 
 export function DashboardView({
   workspaceId,
@@ -47,20 +36,20 @@ export function DashboardView({
     return (
       <div className="space-y-6">
         <MonthNavigator month={month} onChange={setMonth} />
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="space-y-2 rounded-xl border p-6">
+              <div key={i} className="space-y-1 rounded-xl border px-6 py-4">
                 <div className="h-4 w-24 animate-pulse rounded bg-muted" />
                 <div className="h-7 w-28 animate-pulse rounded bg-muted" />
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             {[1, 2].map((i) => (
-              <div key={i} className="space-y-2 rounded-xl border p-6">
+              <div key={i} className="space-y-1 rounded-xl border px-6 py-4">
                 <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-                <div className="h-6 w-24 animate-pulse rounded bg-muted" />
+                <div className="h-7 w-24 animate-pulse rounded bg-muted" />
               </div>
             ))}
           </div>
@@ -237,7 +226,7 @@ export function DashboardView({
       {/* Last snapshot date */}
       {summary.lastSnapshotDate && (
         <p className="text-xs text-muted-foreground">
-          Last updated: {formatSnapshotDate(summary.lastSnapshotDate)}
+          Last updated: {formatDisplayDate(summary.lastSnapshotDate)}
         </p>
       )}
 

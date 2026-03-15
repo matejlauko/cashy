@@ -140,7 +140,9 @@ export async function getDashboardSummary(
       row.monthly_spending_excluding_tracked as bigint,
     ),
     lastSnapshotDate: row.last_snapshot_date
-      ? String(row.last_snapshot_date)
+      ? row.last_snapshot_date instanceof Date
+        ? row.last_snapshot_date.toISOString().slice(0, 10)
+        : String(row.last_snapshot_date)
       : null,
     recurringIncomeTotal: bigintToSafeNumber(
       row.recurring_income_total as bigint,

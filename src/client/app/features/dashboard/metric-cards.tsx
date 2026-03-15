@@ -1,11 +1,6 @@
 import { formatMoneyMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export type MetricCardsProps = {
   currentBalance: number;
@@ -29,11 +24,11 @@ export function MetricCards({
   isCurrentMonth = true,
 }: MetricCardsProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Primary KPIs */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-1">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <Card className="gap-1">
+          <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {isCurrentMonth ? "Current Balance" : "Balance"}
             </CardTitle>
@@ -50,8 +45,8 @@ export function MetricCards({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-1">
+        <Card className="gap-1">
+          <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Monthly Spending
             </CardTitle>
@@ -68,8 +63,8 @@ export function MetricCards({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-1">
+        <Card className="gap-1">
+          <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Everyday Spending
             </CardTitle>
@@ -88,28 +83,28 @@ export function MetricCards({
       </div>
 
       {/* Secondary KPIs */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card>
-          <CardHeader className="pb-1">
+      <div className="grid grid-cols-2 gap-2">
+        <Card className="gap-1">
+          <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Income
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <span className="text-lg font-semibold tabular-nums text-emerald-600">
+            <span className="text-2xl font-semibold tabular-nums text-emerald-600">
               +{formatMoneyMinor(monthlyIncomeTotal)}
             </span>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-1">
+        <Card className="gap-1">
+          <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Tracked Expenses
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <span className="text-lg font-semibold tabular-nums text-destructive">
+            <span className="text-2xl font-semibold tabular-nums text-destructive">
               {monthlyExpenseTotal > 0 ? "\u2212" : ""}
               {formatMoneyMinor(monthlyExpenseTotal)}
             </span>
@@ -119,28 +114,28 @@ export function MetricCards({
 
       {/* Recurring KPIs */}
       {(recurringIncomeTotal > 0 || recurringExpenseTotal > 0) && (
-        <div className="grid grid-cols-2 gap-3">
-          <Card>
-            <CardHeader className="pb-1">
+        <div className="grid grid-cols-2 gap-2">
+          <Card className="gap-1">
+            <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Recurring Income
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <span className="text-lg font-semibold tabular-nums text-emerald-600">
+              <span className="text-2xl font-semibold tabular-nums text-emerald-600">
                 +{formatMoneyMinor(recurringIncomeTotal)}
               </span>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-1">
+          <Card className="gap-1">
+            <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Recurring Expenses
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <span className="text-lg font-semibold tabular-nums text-destructive">
+              <span className="text-2xl font-semibold tabular-nums text-destructive">
                 {recurringExpenseTotal > 0 ? "\u2212" : ""}
                 {formatMoneyMinor(recurringExpenseTotal)}
               </span>
