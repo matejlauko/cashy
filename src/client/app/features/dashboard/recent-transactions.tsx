@@ -24,7 +24,7 @@ export function RecentTransactions({
           <div
             key={tx.id}
             className={cn(
-              "flex items-center justify-between gap-4 px-4 py-3",
+              "flex items-center gap-4 px-4 py-2",
               onEdit &&
                 "cursor-pointer transition-colors hover:bg-muted/50",
             )}
@@ -42,17 +42,18 @@ export function RecentTransactions({
                 : undefined
             }
           >
-            <div className="min-w-0">
-              <span className="truncate text-sm font-medium">{tx.name}</span>
-              <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span>{formatDisplayDate(tx.transactionDate)}</span>
-                <span className="text-muted-foreground/40">&middot;</span>
-                <span className="truncate">{tx.accountName}</span>
-              </div>
-            </div>
+            <span className="shrink-0 text-xs text-muted-foreground w-12">
+              {formatDisplayDate(tx.transactionDate)}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {tx.name}
+            </span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {tx.accountName}
+            </span>
             <span
               className={cn(
-                "shrink-0 text-sm font-medium tabular-nums",
+                "shrink-0 text-sm font-medium tabular-nums text-right w-32",
                 tx.type === "income" ? "text-emerald-600" : "text-destructive",
               )}
             >
