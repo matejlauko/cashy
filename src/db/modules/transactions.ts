@@ -46,7 +46,10 @@ function mapRow(r: Record<string, unknown>): TransactionRow {
     type,
     amountMinor,
     signedAmount: type === "income" ? amountMinor : -amountMinor,
-    transactionDate: String(r.transaction_date),
+    transactionDate:
+      r.transaction_date instanceof Date
+        ? r.transaction_date.toISOString().slice(0, 10)
+        : String(r.transaction_date),
     financialAccountId: r.financial_account_id as string,
     accountName: r.account_name as string,
     createdAt: String(r.created_at),

@@ -43,7 +43,6 @@ The current approach is manual by design. Users will regularly enter account bal
 
 - Budgets or remaining budget calculations
 - Categories or spending breakdowns
-- Recurring transactions
 - Transfers between own accounts
 - Automatic bank sync or imports
 - Multiple currencies
@@ -108,6 +107,7 @@ Historical records should remain intact even when accounts or transactions are h
 - Responsive browser UI
 - English UI with localized date/number formatting
 - CZK currency only
+- Recurring transaction tracking with dashboard summary
 
 ### Out of Scope
 
@@ -210,7 +210,6 @@ Rules:
 - Transactions do not update balances.
 - Transactions exist to explain income and major expenses, not to behave as a double-entry ledger.
 - Transfers between own accounts are out of scope in V1.
-- Recurring transactions are out of scope in V1.
 - Transactions can be edited.
 - Transactions can be soft-deleted.
 
@@ -219,7 +218,29 @@ Soft-delete decision for V1:
 - A soft-deleted transaction is hidden from the default UI and excluded from user-visible transaction totals.
 - The underlying record remains stored for auditability and possible future recovery.
 
-### 8.6 Historical Visibility
+### 8.6 Recurring Transaction
+
+A recurring transaction represents a regular monthly income or expense that the household expects every month, such as rent, salary, loan payments, or subscriptions.
+
+Fields:
+
+- Name
+- Bank name (optional free text)
+- Type: income or expense
+- Amount
+- Day of month (1–31)
+
+Rules:
+
+- Users always enter a positive amount. The sign shown in the UI is derived from the type.
+- Day of month indicates when the recurring item typically occurs each month.
+- All recurring transaction data belongs to exactly one workspace.
+- Recurring transactions can be created, edited, and archived.
+- Archiving hides the recurring transaction from the active list and excludes it from recurring totals. The underlying record is preserved.
+- Recurring totals are displayed on the dashboard as informational KPIs. They do not affect balance calculations, spending metrics, or any other dashboard numbers.
+- Recurring transactions are independent of financial accounts and balance snapshots.
+
+### 8.7 Historical Visibility
 
 Rules:
 
@@ -296,7 +317,14 @@ This number is meant to approximate everyday / uncaptured spending that is visib
 - `monthly_transaction_income_total` = sum of current-month non-deleted income transactions
 - `monthly_transaction_expense_total` = sum of current-month non-deleted expense transactions
 
-### 9.7 Total Balance Chart
+### 9.7 Recurring Transaction Totals
+
+- `recurring_income_total` = sum of all active (non-archived) recurring income transaction amounts
+- `recurring_expense_total` = sum of all active (non-archived) recurring expense transaction amounts
+
+These totals are purely informational. They do not affect current balance, monthly spending, or any other dashboard metric. They are displayed as a separate row of KPI cards on the dashboard, visible only when at least one active recurring transaction exists.
+
+### 9.8 Total Balance Chart
 
 The chart shows total balance over time for the current month.
 
@@ -310,12 +338,13 @@ Rules:
 
 ## 10. Information Architecture
 
-V1 should be small and clear. The product only needs three primary authenticated surfaces:
+V1 should be small and clear. The product needs four primary authenticated surfaces:
 
 1. Login
 2. Dashboard
 3. Transactions
 4. Accounts
+5. Recurring
 
 The dashboard is the home and primary workflow surface.
 
@@ -356,6 +385,11 @@ Secondary metrics:
 
 - Monthly transaction expense total
 - Monthly transaction income total
+
+Tertiary metrics (shown only when recurring transactions exist):
+
+- Recurring income total
+- Recurring expense total
 
 Supporting content:
 
@@ -533,6 +567,58 @@ Requirements:
 - Deleted transaction disappears from default UI
 - Deleted transaction no longer contributes to user-visible transaction totals
 
+### 11.6 Recurring Transactions
+
+#### Recurring Transaction List
+
+Requirements:
+
+- Show active (non-archived) recurring transactions ordered by day of month
+- Each row shows name, bank name (if present), day of month, type, and amount
+- Provide edit action on each recurring transaction
+- Provide archive action on each recurring transaction
+- Clicking a row opens edit
+
+Each row shows:
+
+- Name
+- Bank name (if set)
+- Day of month (formatted as ordinal, e.g. "15th of month")
+- Type badge (income / expense)
+- Signed amount
+
+#### Add Recurring Transaction
+
+Form fields:
+
+- Name
+- Bank name (optional)
+- Amount
+- Day of month (1–31)
+- Type: income / expense
+
+Rules:
+
+- Amount must be positive
+- Type determines sign in displays and totals
+- Day of month must be between 1 and 31
+
+#### Edit Recurring Transaction
+
+Requirements:
+
+- User can edit all recurring transaction fields
+- Updated recurring transaction immediately refreshes the list and dashboard totals
+
+#### Archive Recurring Transaction
+
+Requirements:
+
+- Archive action requires explicit confirmation
+- Archived recurring transactions disappear from the active list
+- Archived recurring transactions no longer contribute to recurring totals on the dashboard
+- The underlying record is preserved
+
 ## 12. Key User Flows
 
 ### 12.1 First Useful Session
@@ -582,6 +668,23 @@ Requirements:
 4. Account disappears from active lists and future update forms.
 5. Historical chart calculations and old references remain intact.
 
+### 12.6 Add a Recurring Transaction
+
+1. User navigates to the Recurring section.
+2. User taps/clicks `Add Recurring`.
+3. User enters name, optional bank name, amount, day of month, and type.
+4. User saves.
+5. Recurring transaction appears in the active list.
+6. Dashboard recurring totals update to reflect the new item.
+
+### 12.7 Archive a Recurring Transaction
+
+1. User navigates to the Recurring section.
+2. User clicks the archive button on a recurring transaction.
+3. User confirms in the archive dialog.
+4. Recurring transaction disappears from the active list.
+5. Dashboard recurring totals update to exclude the archived item.
+
 ## 13. UX Requirements
 
 ### Visual Style
@@ -619,6 +722,7 @@ The product needs useful empty states for:
 - No accounts yet
 - No current-month balance data yet
 - No transactions yet
+- No recurring transactions yet
 
 Each empty state should:
 
@@ -649,6 +753,10 @@ These are product requirements, not implementation details.
 - Credit card balance input is positive owed amount; displayed and calculated as negative.
 - If a user has multiple workspaces, V1 auto-selects the first available workspace and does not provide a workspace selector UI.
 - Transaction amount input is always positive; sign comes from income/expense type.
+- Recurring transaction amounts represent monthly obligations. Frequency is always monthly.
+- Day of month for recurring transactions is stored as an integer 1–31. No special handling for months with fewer than 31 days.
+- Recurring totals on the dashboard are purely informational and do not affect balance, spending, or any other calculated metric.
+- Recurring transactions are not linked to financial accounts; bank name is an optional free-text field.
 - Transfers are out of scope.
 - Filters, pagination, and stale-data alerts are out of scope.
 
@@ -668,7 +776,6 @@ The MVP is successful if:
 - Month browsing and historical reports
 - Transaction categories
 - Transfers between own accounts
-- Recurring transactions
 - Search and filters
 - Attachments or notes
 - Import/export
@@ -690,6 +797,7 @@ The MVP is successful if:
 
 ### P1
 
+- Recurring transaction CRUD with archive and dashboard summary
 - Archived account section
 - Last balance snapshot context on dashboard
 - Additional polish for empty states and trust messaging

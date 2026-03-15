@@ -13,6 +13,8 @@ export type MetricCardsProps = {
   monthlySpendingExcludingTracked: number;
   monthlyIncomeTotal: number;
   monthlyExpenseTotal: number;
+  recurringIncomeTotal: number;
+  recurringExpenseTotal: number;
 };
 
 export function MetricCards({
@@ -21,6 +23,8 @@ export function MetricCards({
   monthlySpendingExcludingTracked,
   monthlyIncomeTotal,
   monthlyExpenseTotal,
+  recurringIncomeTotal,
+  recurringExpenseTotal,
 }: MetricCardsProps) {
   return (
     <div className="space-y-3">
@@ -110,6 +114,38 @@ export function MetricCards({
           </CardContent>
         </Card>
       </div>
+
+      {/* Recurring KPIs */}
+      {(recurringIncomeTotal > 0 || recurringExpenseTotal > 0) && (
+        <div className="grid grid-cols-2 gap-3">
+          <Card>
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Recurring Income
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-lg font-semibold tabular-nums text-emerald-600">
+                +{formatMoneyMinor(recurringIncomeTotal)}
+              </span>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Recurring Expenses
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-lg font-semibold tabular-nums text-destructive">
+                {recurringExpenseTotal > 0 ? "\u2212" : ""}
+                {formatMoneyMinor(recurringExpenseTotal)}
+              </span>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

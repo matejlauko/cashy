@@ -11,6 +11,8 @@ export type DashboardSummary = {
   monthlySpendingTotal: number;
   monthlySpendingExcludingTracked: number;
   lastSnapshotDate: string | null;
+  recurringIncomeTotal: number;
+  recurringExpenseTotal: number;
 };
 
 export type ChartDataPoint = {

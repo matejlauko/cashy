@@ -19,6 +19,10 @@ export type DashboardSummary = {
   monthlySpendingExcludingTracked: number;
   /** Most recent effective_date across all active accounts, or null */
   lastSnapshotDate: string | null;
+  /** Sum of active recurring income transactions (minor units, positive) */
+  recurringIncomeTotal: number;
+  /** Sum of active recurring expense transactions (minor units, positive) */
+  recurringExpenseTotal: number;
 };
 
 export type ChartDataPoint = {
@@ -90,6 +94,14 @@ export async function getDashboardSummary(
         AND ft.transaction_date >= ${monthStart}
         AND ft.transaction_date < ${monthEnd}
         AND ft.deleted_at IS NULL
+    ),
+    recurring_totals AS (
+      SELECT
+        COALESCE(SUM(CASE WHEN rt.type = 'income' THEN rt.amount_minor ELSE 0 END), 0) AS income_total,
+        COALESCE(SUM(CASE WHEN rt.type = 'expense' THEN rt.amount_minor ELSE 0 END), 0) AS expense_total
+      FROM recurring_transaction rt
+      WHERE rt.workspace_id = ${workspaceId}
+        AND rt.archived_at IS NULL
     )
     SELECT
       (SELECT COALESCE(SUM(signed_balance), 0) FROM latest_balances) AS current_balance,
@@ -103,7 +115,9 @@ export async function getDashboardSummary(
         - (SELECT COALESCE(SUM(signed_balance), 0) FROM latest_balances)
         + (SELECT income_total FROM month_transactions)
         - (SELECT expense_total FROM month_transactions) AS monthly_spending_excluding_tracked,
-      (SELECT MAX(effective_date) FROM latest_balances) AS last_snapshot_date
+      (SELECT MAX(effective_date) FROM latest_balances) AS last_snapshot_date,
+      (SELECT income_total FROM recurring_totals) AS recurring_income_total,
+      (SELECT expense_total FROM recurring_totals) AS recurring_expense_total
   `;
 
   const row = rows[0]!;
@@ -127,6 +141,12 @@ export async function getDashboardSummary(
     lastSnapshotDate: row.last_snapshot_date
       ? String(row.last_snapshot_date)
       : null,
+    recurringIncomeTotal: bigintToSafeNumber(
+      row.recurring_income_total as bigint,
+    ),
+    recurringExpenseTotal: bigintToSafeNumber(
+      row.recurring_expense_total as bigint,
+    ),
   };
 }
 

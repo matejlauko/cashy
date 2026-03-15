@@ -17,7 +17,7 @@ import {
 
 interface DashboardViewProps {
   workspaceId: string;
-  onNavigate?: (section: "accounts" | "transactions") => void;
+  onNavigate?: (section: "accounts" | "transactions" | "recurring") => void;
   onEditTransaction?: (transactionId: string) => void;
 }
 
@@ -152,6 +152,8 @@ export function DashboardView({
         }
         monthlyIncomeTotal={summary.monthlyIncomeTotal}
         monthlyExpenseTotal={summary.monthlyExpenseTotal}
+        recurringIncomeTotal={summary.recurringIncomeTotal}
+        recurringExpenseTotal={summary.recurringExpenseTotal}
       />
 
       {/* {chartData.length > 0 && <BalanceChart data={chartData} />} */}

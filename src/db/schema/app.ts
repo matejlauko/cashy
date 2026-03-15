@@ -5,6 +5,7 @@ import {
   timestamp,
   date,
   bigint,
+  integer,
   uniqueIndex,
   index,
   unique,
@@ -93,7 +94,7 @@ export const financialAccount = pgTable(
   },
   (t) => [
     // Composite unique needed as FK target for workspace isolation
-    unique("financial_account_id_workspace_unique").on(t.id, t.workspaceId),
+    unique("financial_account_id_workspace_unique").on(t.workspaceId, t.id),
     // Case-insensitive unique account name per workspace
     uniqueIndex("financial_account_workspace_name_unique").on(
       t.workspaceId,
@@ -183,5 +184,37 @@ export const financialTransaction = pgTable(
     index("financial_transaction_workspace_date_idx")
       .on(t.workspaceId, sql`${t.transactionDate} DESC`)
       .where(sql`${t.deletedAt} is null`),
+  ],
+);
+
+// ─── recurring_transaction ──────────────────────────────────────────────────
+export const recurringTransaction = pgTable(
+  "recurring_transaction",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id),
+    name: text("name").notNull(),
+    bankName: text("bank_name"),
+    type: transactionTypeEnum("type").notNull(),
+    amountMinor: bigint("amount_minor", { mode: "bigint" }).notNull(),
+    dayOfMonth: integer("day_of_month").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedByUserId: text("archived_by_user_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedByUserId: text("updated_by_user_id").notNull(),
+  },
+  (t) => [
+    // Partial index: active recurring transactions per workspace
+    index("recurring_transaction_workspace_active_idx")
+      .on(t.workspaceId)
+      .where(sql`${t.archivedAt} is null`),
   ],
 );
