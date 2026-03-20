@@ -10,6 +10,7 @@ export type MetricCardsProps = {
   monthlyExpenseTotal: number;
   recurringIncomeTotal: number;
   recurringExpenseTotal: number;
+  budgetItemsTotal: number;
   isCurrentMonth?: boolean;
 };
 
@@ -21,8 +22,12 @@ export function MetricCards({
   monthlyExpenseTotal,
   recurringIncomeTotal,
   recurringExpenseTotal,
+  budgetItemsTotal,
   isCurrentMonth = true,
 }: MetricCardsProps) {
+  const availableToSpend =
+    recurringIncomeTotal - recurringExpenseTotal - budgetItemsTotal;
+  const budgetLeft = availableToSpend - monthlySpendingExcludingTracked;
   return (
     <div className="space-y-2">
       {/* Primary KPIs */}
@@ -138,6 +143,28 @@ export function MetricCards({
               <span className="text-2xl font-semibold tabular-nums text-destructive">
                 {recurringExpenseTotal > 0 ? "\u2212" : ""}
                 {formatMoneyMinor(recurringExpenseTotal)}
+              </span>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {budgetItemsTotal > 0 && (
+        <div className="grid grid-cols-1 gap-2">
+          <Card className="gap-1">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Budget Left
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span
+                className={cn(
+                  "text-2xl font-semibold tabular-nums",
+                  budgetLeft < 0 && "text-destructive",
+                )}
+              >
+                {formatMoneyMinor(budgetLeft)}
               </span>
             </CardContent>
           </Card>

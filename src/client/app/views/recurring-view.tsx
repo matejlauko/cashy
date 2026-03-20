@@ -15,6 +15,7 @@ import type {
   UpdateRecurringTransactionInput,
 } from "@/schemas/recurring-transactions";
 import { TRANSACTION_TYPE_LABELS } from "@/schemas/transactions";
+import { useAccounts } from "@/client/app/features/accounts/use-accounts";
 import { formatMoneyMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,9 @@ export function RecurringView({ workspaceId }: RecurringViewProps) {
     isError,
     error,
   } = useRecurringTransactions(workspaceId);
+
+  const { data: accounts } = useAccounts(workspaceId);
+  const accountMap = new Map(accounts?.map((a) => [a.id, a.name]));
 
   const createMutation = useCreateRecurringTransaction(workspaceId);
   const updateMutation = useUpdateRecurringTransaction(workspaceId);
@@ -189,12 +193,12 @@ export function RecurringView({ workspaceId }: RecurringViewProps) {
                 </div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
                   <span>{formatDayOfMonth(item.dayOfMonth)} of month</span>
-                  {item.bankName && (
+                  {item.financialAccountId && accountMap.get(item.financialAccountId) && (
                     <>
                       <span className="text-muted-foreground/40">
                         &middot;
                       </span>
-                      <span className="truncate">{item.bankName}</span>
+                      <span className="truncate">{accountMap.get(item.financialAccountId)}</span>
                     </>
                   )}
                 </div>
@@ -245,6 +249,7 @@ export function RecurringView({ workspaceId }: RecurringViewProps) {
         recurringTransaction={editingItem}
         onSubmit={handleFormSubmit}
         isPending={createMutation.isPending || updateMutation.isPending}
+        workspaceId={workspaceId}
       />
 
       <ArchiveConfirmDialog

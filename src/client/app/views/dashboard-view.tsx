@@ -157,6 +157,7 @@ export function DashboardView({
         monthlyExpenseTotal={summary.monthlyExpenseTotal}
         recurringIncomeTotal={summary.recurringIncomeTotal}
         recurringExpenseTotal={summary.recurringExpenseTotal}
+        budgetItemsTotal={summary.budgetItemsTotal}
         isCurrentMonth={isCurrentMonth}
       />
 

@@ -196,7 +196,7 @@ export const recurringTransaction = pgTable(
       .notNull()
       .references(() => workspace.id),
     name: text("name").notNull(),
-    bankName: text("bank_name"),
+    financialAccountId: text("financial_account_id"),
     type: transactionTypeEnum("type").notNull(),
     amountMinor: bigint("amount_minor", { mode: "bigint" }).notNull(),
     dayOfMonth: integer("day_of_month").notNull(),
@@ -212,9 +212,39 @@ export const recurringTransaction = pgTable(
     updatedByUserId: text("updated_by_user_id").notNull(),
   },
   (t) => [
+    // Composite FK: workspace isolation (nullable – account is optional)
+    foreignKey({
+      columns: [t.financialAccountId, t.workspaceId],
+      foreignColumns: [financialAccount.id, financialAccount.workspaceId],
+      name: "recurring_transaction_account_workspace_fk",
+    }),
     // Partial index: active recurring transactions per workspace
     index("recurring_transaction_workspace_active_idx")
       .on(t.workspaceId)
       .where(sql`${t.archivedAt} is null`),
+  ],
+);
+
+// ─── budget_item ────────────────────────────────────────────────────────────
+export const budgetItem = pgTable(
+  "budget_item",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id),
+    name: text("name").notNull(),
+    amountMinor: bigint("amount_minor", { mode: "bigint" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdByUserId: text("created_by_user_id").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedByUserId: text("updated_by_user_id").notNull(),
+  },
+  (t) => [
+    index("budget_item_workspace_idx").on(t.workspaceId),
   ],
 );

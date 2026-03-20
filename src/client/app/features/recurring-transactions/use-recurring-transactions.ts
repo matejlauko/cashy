@@ -4,7 +4,7 @@ import { rpc } from "@/client/rpc";
 export type RecurringTransaction = {
   id: string;
   name: string;
-  bankName: string | null;
+  financialAccountId: string | null;
   type: "income" | "expense";
   amountMinor: number;
   signedAmount: number;

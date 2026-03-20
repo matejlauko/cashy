@@ -8,7 +8,7 @@ const safeMinorUnitsSchema = z
 
 const recurringTransactionInputShape = {
   name: z.string().trim().min(1, "Name is required").max(200),
-  bankName: z.string().trim().max(100).optional(),
+  financialAccountId: z.string().optional(),
   type: transactionTypeSchema,
   amountMinor: safeMinorUnitsSchema.refine(
     (v) => v > 0,

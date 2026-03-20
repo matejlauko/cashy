@@ -13,6 +13,7 @@ export type DashboardSummary = {
   lastSnapshotDate: string | null;
   recurringIncomeTotal: number;
   recurringExpenseTotal: number;
+  budgetItemsTotal: number;
 };
 
 export type ChartDataPoint = {

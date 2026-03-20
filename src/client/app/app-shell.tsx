@@ -17,13 +17,15 @@ import {
   Wallet,
   ArrowLeftRight,
   Repeat,
+  PiggyBank,
 } from "lucide-react";
 import { DashboardView } from "./views/dashboard-view";
 import { AccountsView } from "./views/accounts-view";
 import { TransactionsView } from "./views/transactions-view";
 import { RecurringView } from "./views/recurring-view";
+import { BudgetView } from "./views/budget-view";
 
-type Section = "dashboard" | "accounts" | "transactions" | "recurring";
+type Section = "dashboard" | "accounts" | "transactions" | "recurring" | "budget";
 type SessionBootstrap = {
   user: {
     id: string;
@@ -41,6 +43,7 @@ const sections: { id: Section; label: string }[] = [
   { id: "accounts", label: "Accounts" },
   { id: "transactions", label: "Transactions" },
   { id: "recurring", label: "Recurring" },
+  { id: "budget", label: "Budget" },
 ];
 
 const navIcons = {
@@ -48,6 +51,7 @@ const navIcons = {
   accounts: Wallet,
   transactions: ArrowLeftRight,
   recurring: Repeat,
+  budget: PiggyBank,
 } as const;
 
 class SessionBootstrapError extends Error {
@@ -373,6 +377,9 @@ export function AppShell() {
         )}
         {activeSection === "recurring" && (
           <RecurringView workspaceId={session.activeWorkspaceId} />
+        )}
+        {activeSection === "budget" && (
+          <BudgetView workspaceId={session.activeWorkspaceId} />
         )}
       </main>
     </div>

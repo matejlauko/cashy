@@ -16,6 +16,7 @@ import { balanceSnapshotsRoute } from "@/api/routes/balance-snapshots";
 import { transactionsRoute } from "@/api/routes/transactions";
 import { dashboardRoute } from "@/api/routes/dashboard";
 import { recurringTransactionsRoute } from "@/api/routes/recurring-transactions";
+import { budgetItemsRoute } from "@/api/routes/budget-items";
 
 const app = new Hono<AppEnv>().basePath("/api");
 
@@ -51,6 +52,8 @@ app.use("/dashboard", sessionMiddleware, workspaceMiddleware);
 app.use("/dashboard/*", sessionMiddleware, workspaceMiddleware);
 app.use("/recurring-transactions", sessionMiddleware, workspaceMiddleware);
 app.use("/recurring-transactions/*", sessionMiddleware, workspaceMiddleware);
+app.use("/budget-items", sessionMiddleware, workspaceMiddleware);
+app.use("/budget-items/*", sessionMiddleware, workspaceMiddleware);
 
 // ── Routes (chained for RPC type inference) ────────────────────────
 const routes = app
@@ -60,7 +63,8 @@ const routes = app
   .route("/balance-snapshots", balanceSnapshotsRoute)
   .route("/transactions", transactionsRoute)
   .route("/dashboard", dashboardRoute)
-  .route("/recurring-transactions", recurringTransactionsRoute);
+  .route("/recurring-transactions", recurringTransactionsRoute)
+  .route("/budget-items", budgetItemsRoute);
 
 export type AppType = typeof routes;
 export { routes as honoApp };

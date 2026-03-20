@@ -23,6 +23,8 @@ export type DashboardSummary = {
   recurringIncomeTotal: number;
   /** Sum of active recurring expense transactions (minor units, positive) */
   recurringExpenseTotal: number;
+  /** Sum of all budget item amounts (minor units, positive) */
+  budgetItemsTotal: number;
 };
 
 export type ChartDataPoint = {
@@ -103,6 +105,12 @@ export async function getDashboardSummary(
       FROM recurring_transaction rt
       WHERE rt.workspace_id = ${workspaceId}
         AND rt.archived_at IS NULL
+    ),
+    budget_totals AS (
+      SELECT
+        COALESCE(SUM(bi.amount_minor), 0) AS total
+      FROM budget_item bi
+      WHERE bi.workspace_id = ${workspaceId}
     )
     SELECT
       (SELECT COALESCE(SUM(signed_balance), 0) FROM latest_balances) AS current_balance,
@@ -118,7 +126,8 @@ export async function getDashboardSummary(
         - (SELECT expense_total FROM month_transactions) AS monthly_spending_excluding_tracked,
       (SELECT MAX(effective_date) FROM latest_balances) AS last_snapshot_date,
       (SELECT income_total FROM recurring_totals) AS recurring_income_total,
-      (SELECT expense_total FROM recurring_totals) AS recurring_expense_total
+      (SELECT expense_total FROM recurring_totals) AS recurring_expense_total,
+      (SELECT total FROM budget_totals) AS budget_items_total
   `;
 
   const row = rows[0]!;
@@ -149,6 +158,9 @@ export async function getDashboardSummary(
     ),
     recurringExpenseTotal: bigintToSafeNumber(
       row.recurring_expense_total as bigint,
+    ),
+    budgetItemsTotal: bigintToSafeNumber(
+      row.budget_items_total as bigint,
     ),
   };
 }

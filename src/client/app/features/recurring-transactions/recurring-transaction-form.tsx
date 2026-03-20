@@ -13,6 +13,7 @@ import {
   transactionTypeSchema,
 } from "@/schemas/transactions";
 import { parseMoneyInput } from "@/lib/money";
+import { useAccounts } from "@/client/app/features/accounts/use-accounts";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,7 @@ import {
 
 const formSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
-  bankName: z.string().trim().max(100).optional(),
+  financialAccountId: z.string().optional(),
   amount: z.string().min(1, "Amount is required"),
   dayOfMonth: z.string().min(1, "Day is required"),
   type: transactionTypeSchema,
@@ -50,6 +51,7 @@ export interface RecurringTransactionFormDialogProps {
     data: CreateRecurringTransactionInput | UpdateRecurringTransactionInput,
   ) => Promise<void>;
   isPending: boolean;
+  workspaceId: string;
 }
 
 export function RecurringTransactionFormDialog({
@@ -58,8 +60,10 @@ export function RecurringTransactionFormDialog({
   recurringTransaction,
   onSubmit,
   isPending,
+  workspaceId,
 }: RecurringTransactionFormDialogProps) {
   const isEdit = recurringTransaction !== null;
+  const { data: accounts } = useAccounts(workspaceId);
 
   const {
     register,
@@ -73,7 +77,7 @@ export function RecurringTransactionFormDialog({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      bankName: "",
+      financialAccountId: "",
       amount: "",
       dayOfMonth: "",
       type: "expense",
@@ -85,7 +89,7 @@ export function RecurringTransactionFormDialog({
       if (recurringTransaction) {
         reset({
           name: recurringTransaction.name,
-          bankName: recurringTransaction.bankName ?? "",
+          financialAccountId: recurringTransaction.financialAccountId ?? "",
           amount: (recurringTransaction.amountMinor / 100).toFixed(2),
           dayOfMonth: String(recurringTransaction.dayOfMonth),
           type: recurringTransaction.type,
@@ -93,7 +97,7 @@ export function RecurringTransactionFormDialog({
       } else {
         reset({
           name: "",
-          bankName: "",
+          financialAccountId: "",
           amount: "",
           dayOfMonth: "",
           type: "expense",
@@ -103,6 +107,7 @@ export function RecurringTransactionFormDialog({
   }, [open, recurringTransaction, reset]);
 
   const currentType = watch("type");
+  const currentAccountId = watch("financialAccountId");
 
   const onFormSubmit = handleSubmit(async (values) => {
     let amountMinor: number;
@@ -132,7 +137,7 @@ export function RecurringTransactionFormDialog({
     try {
       await onSubmit({
         name: values.name,
-        bankName: values.bankName || undefined,
+        financialAccountId: values.financialAccountId || undefined,
         amountMinor,
         dayOfMonth,
         type: values.type,
@@ -181,18 +186,28 @@ export function RecurringTransactionFormDialog({
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="rt-bank">Bank (optional)</Label>
-            <Input
-              id="rt-bank"
-              placeholder="e.g. CSOB, Fio"
-              {...register("bankName")}
-              aria-invalid={!!errors.bankName}
-            />
-            {errors.bankName && (
-              <p className="text-xs text-destructive">
-                {errors.bankName.message}
-              </p>
-            )}
+            <Label>Account (optional)</Label>
+            <Select
+              value={currentAccountId || ""}
+              onValueChange={(val) =>
+                setValue("financialAccountId", val === "__none__" ? "" : val, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="No account" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No account</SelectItem>
+                {accounts?.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid gap-1.5">

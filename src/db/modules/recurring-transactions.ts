@@ -22,7 +22,7 @@ export class RecurringTransactionError extends Error {
 export type RecurringTransactionRow = {
   id: string;
   name: string;
-  bankName: string | null;
+  financialAccountId: string | null;
   type: "income" | "expense";
   /** Always positive (raw DB value) */
   amountMinor: number;
@@ -41,7 +41,7 @@ function mapRow(r: Record<string, unknown>): RecurringTransactionRow {
   return {
     id: r.id as string,
     name: r.name as string,
-    bankName: (r.bank_name as string) ?? null,
+    financialAccountId: (r.financial_account_id as string) ?? null,
     type,
     amountMinor,
     signedAmount: type === "income" ? amountMinor : -amountMinor,
@@ -58,7 +58,7 @@ export async function listActive(
 ): Promise<RecurringTransactionRow[]> {
   const rows = await sql`
     SELECT
-      id, name, bank_name, type, amount_minor,
+      id, name, financial_account_id, type, amount_minor,
       day_of_month, created_at, updated_at
     FROM recurring_transaction
     WHERE workspace_id = ${workspaceId}
@@ -74,7 +74,7 @@ export async function getById(
 ): Promise<RecurringTransactionRow | null> {
   const rows = await sql`
     SELECT
-      id, name, bank_name, type, amount_minor,
+      id, name, financial_account_id, type, amount_minor,
       day_of_month, created_at, updated_at
     FROM recurring_transaction
     WHERE id = ${id}
@@ -93,15 +93,15 @@ export async function create(
   data: CreateRecurringTransactionInput,
 ): Promise<RecurringTransactionRow> {
   const id = crypto.randomUUID();
-  const bankName = data.bankName?.trim() || null;
+  const financialAccountId = data.financialAccountId || null;
 
   await sql`
     INSERT INTO recurring_transaction (
-      id, workspace_id, name, bank_name, type,
+      id, workspace_id, name, financial_account_id, type,
       amount_minor, day_of_month,
       created_by_user_id, updated_by_user_id
     ) VALUES (
-      ${id}, ${workspaceId}, ${data.name}, ${bankName},
+      ${id}, ${workspaceId}, ${data.name}, ${financialAccountId},
       ${data.type}, ${data.amountMinor}, ${data.dayOfMonth},
       ${userId}, ${userId}
     )
@@ -122,7 +122,7 @@ export async function update(
 ): Promise<RecurringTransactionRow | null> {
   const existing = await sql`
     SELECT
-      id, name, bank_name, type, amount_minor,
+      id, name, financial_account_id, type, amount_minor,
       day_of_month, archived_at
     FROM recurring_transaction
     WHERE id = ${id}
@@ -143,10 +143,10 @@ export async function update(
 
   const row = existing[0]!;
   const nextName = data.name ?? (row.name as string);
-  const nextBankName =
-    data.bankName !== undefined
-      ? data.bankName?.trim() || null
-      : (row.bank_name as string | null);
+  const nextFinancialAccountId =
+    data.financialAccountId !== undefined
+      ? data.financialAccountId || null
+      : (row.financial_account_id as string | null);
   const nextType = data.type ?? (row.type as "income" | "expense");
   const nextAmountMinor =
     data.amountMinor ?? bigintToSafeNumber(row.amount_minor as bigint);
@@ -156,7 +156,7 @@ export async function update(
     UPDATE recurring_transaction
     SET
       name = ${nextName},
-      bank_name = ${nextBankName},
+      financial_account_id = ${nextFinancialAccountId},
       type = ${nextType},
       amount_minor = ${nextAmountMinor},
       day_of_month = ${nextDayOfMonth},
