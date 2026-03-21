@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
-  namespace: money-ts
+  namespace: cashy
   labels:
     app: postgres
 spec:

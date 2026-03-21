@@ -1,29 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: money-ts-app
-  namespace: money-ts
+  name: cashy-app
+  namespace: cashy
   labels:
-    app: money-ts-app
+    app: cashy-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: money-ts-app
+      app: cashy-app
   template:
     metadata:
       labels:
-        app: money-ts-app
+        app: cashy-app
     spec:
       containers:
         - name: app
-          image: money-ts-app:latest
+          image: cashy-app:latest
           ports:
             - containerPort: 3050
               name: http
           envFrom:
             - secretRef:
-                name: money-ts-app
+                name: cashy-app
           env:
             - name: PORT
               value: "3050"
