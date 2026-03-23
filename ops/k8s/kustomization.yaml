@@ -9,4 +9,3 @@ resources:
   - app-deployment.yaml
   - https-redirect-middleware.yaml
   - ingress.yaml
-  - cluster-issuer.yaml
