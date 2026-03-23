@@ -1,5 +1,5 @@
 FROM oven/bun:1 AS base
-WORKDIR /app
+WORKDIR /srv
 
 # 1. Install dependencies (cached layer when lock unchanged)
 COPY package.json bun.lock ./
