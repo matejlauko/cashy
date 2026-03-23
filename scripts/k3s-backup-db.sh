@@ -4,9 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NAMESPACE="${NAMESPACE:-cashy}"
 APP_ENV_FILE="${APP_ENV_FILE:-${ROOT_DIR}/ops/k8s/app.env}"
-LOCAL_PORT="${LOCAL_PORT:-15432}"
 BACKUP_DIR="${BACKUP_DIR:-${ROOT_DIR}/backups}"
-PORT_FORWARD_LOG="${PORT_FORWARD_LOG:-/tmp/cashy-k3s-port-forward.log}"
 
 if [[ ! -f "${APP_ENV_FILE}" ]]; then
   echo "Missing ${APP_ENV_FILE}. Copy ops/k8s/app.env.example first."
@@ -26,14 +24,20 @@ fi
 
 kubectl -n "${NAMESPACE}" wait --for=condition=Ready pod -l app=postgres --timeout=180s >/dev/null
 postgres_pod="$(kubectl -n "${NAMESPACE}" get pod -l app=postgres -o jsonpath='{.items[0].metadata.name}')"
-kubectl -n "${NAMESPACE}" port-forward "pod/${postgres_pod}" "${LOCAL_PORT}:5432" >"${PORT_FORWARD_LOG}" 2>&1 &
-port_forward_pid=$!
-cleanup() {
-  kill "${port_forward_pid}" >/dev/null 2>&1 || true
-}
-trap cleanup EXIT
 
-sleep 2
+now="$(date +%Y-%m-%d_%H-%M-%S)"
+dir="${BACKUP_DIR}/${now}"
+mkdir -p "${dir}"
 
-local_database_url="${database_url/@postgres:5432/@127.0.0.1:${LOCAL_PORT}}"
-DATABASE_URL="${local_database_url}" BACKUP_DIR="${BACKUP_DIR}" bun "${ROOT_DIR}/scripts/backup-db.ts"
+echo "Backing up to ${dir}/"
+
+# Use pg_dump from inside the container to avoid version mismatch
+kubectl -n "${NAMESPACE}" exec "${postgres_pod}" -- \
+  pg_dump "${database_url}" --schema-only --no-owner --no-privileges > "${dir}/schema.sql"
+echo "Schema saved to schema.sql"
+
+kubectl -n "${NAMESPACE}" exec "${postgres_pod}" -- \
+  pg_dump "${database_url}" --data-only --no-owner --no-privileges > "${dir}/data.sql"
+echo "Data saved to data.sql"
+
+echo "Done!"
