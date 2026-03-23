@@ -6,6 +6,8 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
+const backupRoot = process.env.BACKUP_DIR ?? "backups";
+
 const now = new Date();
 const timestamp = now
   .toISOString()
@@ -13,7 +15,7 @@ const timestamp = now
   .replace(/:/g, "-")
   .replace(/\..+/, "");
 
-const dir = `backups/${timestamp}`;
+const dir = `${backupRoot}/${timestamp}`;
 await $`mkdir -p ${dir}`;
 
 console.log(`Backing up to ${dir}/`);

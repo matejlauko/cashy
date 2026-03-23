@@ -1,4 +1,4 @@
-# Money TS
+# Cashy
 
 Personal household money tracker built with Bun, Hono, React, and PostgreSQL.
 
@@ -12,21 +12,25 @@ Personal household money tracker built with Bun, Hono, React, and PostgreSQL.
 ### Setup
 
 1. Start PostgreSQL:
+
    ```bash
    docker compose up -d
    ```
 
 2. Copy environment file and adjust values:
+
    ```bash
    cp .env.example .env
    ```
 
 3. Install dependencies:
+
    ```bash
    bun install
    ```
 
 4. Push database schema:
+
    ```bash
    bunx drizzle-kit push
    ```
@@ -36,7 +40,7 @@ Personal household money tracker built with Bun, Hono, React, and PostgreSQL.
    bun dev
    ```
 
-The app runs at http://localhost:3050.
+The app runs at http://localhost:3000.
 
 ### Building for Production
 
@@ -57,7 +61,7 @@ bun start
 ### Build
 
 ```bash
-docker build -t money-ts-app .
+docker build -t cashy-app .
 ```
 
 ### Run
@@ -66,85 +70,136 @@ docker build -t money-ts-app .
 docker run --rm \
   --env-file .env \
   -e NODE_ENV=production \
-  -p 3050:3050 \
-  money-ts-app
+  -p 3000:3000 \
+  cashy-app
 ```
 
 The container needs network access to PostgreSQL. When running alongside the compose PostgreSQL, use `--network host` or configure Docker networking.
 
 ## Production Deployment (k3s)
 
-### Rollout Order
+This setup is intentionally small and self-hosted:
 
-1. **Create namespace:**
+- Single-node `k3s`
+- Built-in Traefik ingress controller
+- Built-in `local-path` storage class
+- In-cluster PostgreSQL
+- Automatic TLS via cert-manager + Let's Encrypt
+- App image built locally and imported directly into k3s
+
+### Prerequisites
+
+- DNS for `cashy.lauko.io` points at your VPS
+- Ports `80` and `443` are reachable from the internet
+- `kubectl`, `docker`, `sudo`, and `bun` are available on the machine you use for deploys
+- `k3s` is installed on the VPS
+
+Google OAuth for web apps requires HTTPS outside localhost, so `APP_URL` must be the final `https://...` URL before login will work.
+
+### One-time Configuration
+
+1. Copy the secret env files:
+
    ```bash
-   kubectl apply -f ops/k8s/namespace.yaml
+   cp ops/k8s/app.env.example ops/k8s/app.env
+   cp ops/k8s/postgres.env.example ops/k8s/postgres.env
    ```
 
-2. **Create secrets:**
-   ```bash
-   kubectl -n money-ts create secret generic postgres-credentials \
-     --from-literal=POSTGRES_PASSWORD='<strong-password>'
+2. Edit `ops/k8s/app.env`:
+   - Set `APP_URL=https://cashy.lauko.io`
+   - Set `DATABASE_URL=postgres://app:<password>@postgres:5432/app`
+   - Fill in `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET`
 
-   kubectl -n money-ts create secret generic money-ts-app \
-     --from-literal=DATABASE_URL='postgres://app:<password>@postgres:5432/app' \
-     --from-literal=APP_URL='https://money.example.com' \
-     --from-literal=BETTER_AUTH_SECRET='<random-secret>' \
-     --from-literal=GOOGLE_CLIENT_ID='<id>' \
-     --from-literal=GOOGLE_CLIENT_SECRET='<secret>'
+3. Edit `ops/k8s/postgres.env`:
+   - Set `POSTGRES_PASSWORD` to the same password used in `DATABASE_URL`
+
+4. Edit `ops/k8s/cluster-issuer.yaml`:
+   - Replace `replace-with-real-email@example.com` with your real Let's Encrypt email
+
+5. If you are not using `cashy.lauko.io`, update the host in `ops/k8s/ingress.yaml` and `APP_URL` in `ops/k8s/app.env` to the same final hostname.
+
+### First Deploy
+
+1. Install cert-manager:
+
+   ```bash
+   ./scripts/k3s-install-cert-manager.sh
    ```
 
-3. **Deploy PostgreSQL:**
+2. Apply the app and database secrets:
+
    ```bash
-   kubectl apply -f ops/k8s/postgres-statefulset.yaml
-   kubectl apply -f ops/k8s/postgres-service.yaml
-   kubectl -n money-ts wait --for=condition=Ready pod -l app=postgres --timeout=60s
+   ./scripts/k3s-apply-secrets.sh
    ```
 
-4. **Push database schema** (from a machine with DB access):
+3. Build the image and import it into k3s:
+
    ```bash
-   DATABASE_URL='postgres://app:<password>@<db-host>:5432/app' bunx drizzle-kit push
+   IMAGE_TAG=$(git rev-parse --short HEAD) ./scripts/k3s-build-image.sh
    ```
 
-5. **Build and import app image:**
+4. Push the database schema:
+
    ```bash
-   docker build -t money-ts-app:latest .
-   docker save money-ts-app:latest | sudo k3s ctr images import -
+   ./scripts/k3s-db-push.sh
    ```
 
-6. **Deploy app:**
+5. Deploy the manifests:
+
    ```bash
-   kubectl apply -f ops/k8s/app-deployment.yaml
-   kubectl apply -f ops/k8s/app-service.yaml
-   kubectl apply -f ops/k8s/ingress.yaml
+   IMAGE_TAG=$(git rev-parse --short HEAD) ./scripts/k3s-deploy.sh
    ```
 
-7. **Verify:**
+6. Verify the rollout:
+
    ```bash
-   kubectl -n money-ts wait --for=condition=Ready pod -l app=money-ts-app --timeout=60s
-   kubectl -n money-ts get pods
+   kubectl -n cashy get pods
+   kubectl -n cashy get ingress
+   kubectl describe clusterissuer letsencrypt-prod
    ```
 
-8. **Smoke test:**
-   - `curl -s https://money.example.com/healthz` returns `OK`
-   - `curl -s https://money.example.com/readyz` returns `OK`
-   - Open browser, verify Google login works
-   - Create an account and update balances to confirm writes work
+7. Smoke test:
+   - `curl -I https://cashy.lauko.io/healthz`
+   - `curl -I https://cashy.lauko.io/readyz`
+   - Open the app and complete Google login
+
+The first certificate issuance can take a minute or two after the ingress is created.
 
 ### Updating the App
 
-1. Build new image and import to k3s
-2. If schema changed: run `bunx drizzle-kit push` against production DB first
-3. Restart deployment: `kubectl -n money-ts rollout restart deployment/money-ts-app`
-4. Wait for rollout: `kubectl -n money-ts rollout status deployment/money-ts-app`
-5. Smoke test
+1. Build and import a new image:
+
+   ```bash
+   IMAGE_TAG=$(git rev-parse --short HEAD) ./scripts/k3s-build-image.sh
+   ```
+
+2. If the schema changed, push it before the rollout:
+
+   ```bash
+   ./scripts/k3s-db-push.sh
+   ```
+
+3. Deploy the new image:
+   ```bash
+   IMAGE_TAG=$(git rev-parse --short HEAD) ./scripts/k3s-deploy.sh
+   ```
+
+### Backups
+
+Create a local SQL backup through a temporary tunnel to the in-cluster database:
+
+```bash
+BACKUP_DIR=/srv/backups/cashy ./scripts/k3s-backup-db.sh
+```
+
+Keep those backups off the VPS as well if you care about recovery from disk loss.
 
 ## Health Endpoints
 
-| Endpoint | Purpose | Success | Failure |
-|----------|---------|---------|---------|
-| `/healthz` | Process alive | 200 OK | No response |
-| `/readyz` | DB connectivity | 200 OK | 503 Service Unavailable |
+| Endpoint   | Purpose         | Success | Failure                 |
+| ---------- | --------------- | ------- | ----------------------- |
+| `/healthz` | Process alive   | 200 OK  | No response             |
+| `/readyz`  | DB connectivity | 200 OK  | 503 Service Unavailable |
 
 ## Reference Docs
 

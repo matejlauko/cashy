@@ -7,6 +7,12 @@ metadata:
     app: cashy-app
 spec:
   replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: cashy-app
@@ -15,18 +21,34 @@ spec:
       labels:
         app: cashy-app
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
       containers:
         - name: app
           image: cashy-app:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 3050
+            - containerPort: 3000
               name: http
           envFrom:
             - secretRef:
                 name: cashy-app
           env:
             - name: PORT
-              value: "3050"
+              value: "3000"
             - name: NODE_ENV
               value: production
             - name: LOG_LEVEL
@@ -34,7 +56,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /readyz
-              port: 3050
+              port: 3000
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3
@@ -42,7 +64,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 3050
+              port: 3000
             initialDelaySeconds: 10
             periodSeconds: 15
             timeoutSeconds: 3
@@ -53,4 +75,4 @@ spec:
               memory: 128Mi
             limits:
               cpu: 500m
-              memory: 256Mi
+              memory: 512Mi

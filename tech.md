@@ -175,15 +175,15 @@ No test runner additions are planned because tests are explicitly out of scope f
 
 ### Required environment variables
 
-| Variable | Example local value | Notes |
-| --- | --- | --- |
-| `PORT` | `3050` | Bun listen port |
-| `APP_URL` | `http://localhost:3050` | Public app URL |
-| `DATABASE_URL` | `postgres://app:pass@localhost:5432/app` | Shared by Bun SQL, Drizzle, and auth |
-| `BETTER_AUTH_SECRET` | generated secret | Required by Better Auth |
-| `GOOGLE_CLIENT_ID` | `...` | Google OAuth |
-| `GOOGLE_CLIENT_SECRET` | `...` | Google OAuth |
-| `LOG_LEVEL` | `debug` | Structured debug logging |
+| Variable               | Example local value                      | Notes                                |
+| ---------------------- | ---------------------------------------- | ------------------------------------ |
+| `PORT`                 | `3000`                                   | Bun listen port                      |
+| `APP_URL`              | `http://localhost:3000`                  | Public app URL                       |
+| `DATABASE_URL`         | `postgres://app:pass@localhost:5432/app` | Shared by Bun SQL, Drizzle, and auth |
+| `BETTER_AUTH_SECRET`   | generated secret                         | Required by Better Auth              |
+| `GOOGLE_CLIENT_ID`     | `...`                                    | Google OAuth                         |
+| `GOOGLE_CLIENT_SECRET` | `...`                                    | Google OAuth                         |
+| `LOG_LEVEL`            | `debug`                                  | Structured debug logging             |
 
 ### Startup validation
 
@@ -739,7 +739,12 @@ CSRF protection: all mutation endpoints accept only `application/json` bodies. C
 All API errors use a consistent JSON shape:
 
 ```typescript
-{ error: { code: string; message: string } }
+{
+  error: {
+    code: string;
+    message: string;
+  }
+}
 ```
 
 HTTP status conventions:
@@ -762,8 +767,8 @@ Route type composition: each route group file (e.g., `src/api/routes/accounts.ts
 const app = new Hono()
   .route("/auth", authRoutes)
   .route("/session", sessionRoutes)
-  .route("/accounts", accountRoutes)
-  // ...
+  .route("/accounts", accountRoutes);
+// ...
 
 export type AppType = typeof app;
 ```
@@ -1246,7 +1251,6 @@ Because there is no test suite and no staging, this manual checklist is the rele
 - `/healthz` returns 200
 - `/readyz` returns 200
 - logs show request id, user id, and workspace id on mutations
-
 
 ## 15. Accepted Risks and Tradeoffs
 

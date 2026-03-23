@@ -14,5 +14,5 @@ RUN bun run build.ts
 
 # 4. Runtime
 ENV NODE_ENV=production
-EXPOSE 3050
+EXPOSE 3000
 CMD ["bun", "src/index.ts"]

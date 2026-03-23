@@ -11,6 +11,6 @@ spec:
     app: cashy-app
   ports:
     - port: 80
-      targetPort: 3050
+      targetPort: 3000
       protocol: TCP
       name: http
