@@ -120,45 +120,39 @@ Google OAuth for web apps requires HTTPS outside localhost, so `APP_URL` must be
 
 ### First Deploy
 
-1. Install cert-manager:
-
-   ```bash
-   ./scripts/k3s-install-cert-manager.sh
-   ```
-
-2. Apply the app and database secrets:
+1. Apply the app and database secrets:
 
    ```bash
    ./scripts/k3s-apply-secrets.sh
    ```
 
-3. Build the image and import it into k3s:
+2. Build the image and import it into k3s:
 
    ```bash
    IMAGE_TAG=$(git rev-parse --short HEAD) ./scripts/k3s-build-image.sh
    ```
 
-4. Push the database schema:
+3. Push the database schema:
 
    ```bash
    ./scripts/k3s-db-push.sh
    ```
 
-5. Deploy the manifests:
+4. Deploy the manifests:
 
    ```bash
    IMAGE_TAG=$(git rev-parse --short HEAD) ./scripts/k3s-deploy.sh
    ```
 
-6. Verify the rollout:
+5. Verify the rollout:
 
    ```bash
    kubectl -n cashy get pods
    kubectl -n cashy get ingress
-   kubectl describe clusterissuer letsencrypt-prod
+   kubectl describe clusterissuer letsencrypt-production
    ```
 
-7. Smoke test:
+6. Smoke test:
    - `curl -I https://cashy.lauko.io/healthz`
    - `curl -I https://cashy.lauko.io/readyz`
    - Open the app and complete Google login

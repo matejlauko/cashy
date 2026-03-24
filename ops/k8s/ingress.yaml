@@ -4,7 +4,7 @@ metadata:
   name: cashy-app
   namespace: cashy
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: letsencrypt-production
     traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
     traefik.ingress.kubernetes.io/router.middlewares: cashy-https-redirect@kubernetescrd
 spec:
