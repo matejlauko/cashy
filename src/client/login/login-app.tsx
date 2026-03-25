@@ -41,7 +41,7 @@ export function LoginApp() {
     <div className="grid min-h-screen place-items-center">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Money TS</CardTitle>
+          <CardTitle className="text-2xl">Cashy</CardTitle>
           <CardDescription>Sign in to continue</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

@@ -282,7 +282,7 @@ export function AppShell() {
         <div className="container mx-auto flex items-center justify-between p-4">
           <div className="flex items-center gap-2.5">
             <span className="text-base font-bold tracking-tight">
-              Money<span className="font-semibold text-primary/60">TS</span>
+              Cashy
             </span>
             <span className="text-muted-foreground/40">·</span>
             {session.workspaces.length > 1 ? (
