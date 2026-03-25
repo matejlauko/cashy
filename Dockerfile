@@ -7,7 +7,7 @@ RUN bun install --frozen-lockfile
 
 COPY src/ src/
 COPY build.ts tsconfig.json bunfig.toml ./
-RUN bun run build.ts
+RUN bun run build
 
 # Re-install without devDependencies for a lean node_modules
 RUN rm -rf node_modules && bun install --frozen-lockfile --production
@@ -25,4 +25,4 @@ COPY --from=build /srv/bunfig.toml .
 
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["bun", "src/index.ts"]
+CMD ["bun", "start"]

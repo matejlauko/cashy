@@ -29,6 +29,9 @@ kubectl apply -f "${ROOT_DIR}/ops/k8s/https-redirect-middleware.yaml"
 kubectl apply -f "${ROOT_DIR}/ops/k8s/app-service.yaml"
 kubectl apply -f "${ROOT_DIR}/ops/k8s/app-deployment.yaml"
 kubectl -n "${NAMESPACE}" set image deployment/"${APP_NAME}" app="${FULL_IMAGE}"
+kubectl -n "${NAMESPACE}" annotate deployment/"${APP_NAME}" \
+  kubernetes.io/change-cause="${IMAGE_TAG} - $(date -u '+%Y-%m-%d %H:%M:%S')" \
+  --overwrite
 kubectl apply -f "${ROOT_DIR}/ops/k8s/ingress.yaml"
 kubectl -n "${NAMESPACE}" rollout status deployment/"${APP_NAME}" --timeout=180s
 
