@@ -19,7 +19,8 @@ import type {
   UpdateBudgetItemInput,
 } from "@/schemas/budget-items";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetricInfo } from "@/components/ui/metric-info";
 import { Plus, PiggyBank, Pencil, Trash2 } from "lucide-react";
 
 interface BudgetViewProps {
@@ -175,6 +176,9 @@ export function BudgetView({ workspaceId }: BudgetViewProps) {
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Total Planned
                 </CardTitle>
+                <CardAction>
+                  <MetricInfo metricKey="totalPlanned" />
+                </CardAction>
               </CardHeader>
               <CardContent>
                 <span className="text-2xl font-semibold tabular-nums">
@@ -188,6 +192,9 @@ export function BudgetView({ workspaceId }: BudgetViewProps) {
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Available to Spend
                 </CardTitle>
+                <CardAction>
+                  <MetricInfo metricKey="availableToSpend" />
+                </CardAction>
               </CardHeader>
               <CardContent>
                 <span
