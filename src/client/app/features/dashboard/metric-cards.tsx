@@ -1,6 +1,7 @@
 import { formatMoneyMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetricInfo } from "@/components/ui/metric-info";
 
 export type MetricCardsProps = {
   currentBalance: number;
@@ -37,6 +38,9 @@ export function MetricCards({
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {isCurrentMonth ? "Current Balance" : "Balance"}
             </CardTitle>
+            <CardAction>
+              <MetricInfo metricKey="currentBalance" />
+            </CardAction>
           </CardHeader>
           <CardContent>
             <span
@@ -55,6 +59,9 @@ export function MetricCards({
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Monthly Spending
             </CardTitle>
+            <CardAction>
+              <MetricInfo metricKey="monthlySpending" />
+            </CardAction>
           </CardHeader>
           <CardContent>
             <span
@@ -73,6 +80,9 @@ export function MetricCards({
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Everyday Spending
             </CardTitle>
+            <CardAction>
+              <MetricInfo metricKey="everydaySpending" />
+            </CardAction>
           </CardHeader>
           <CardContent>
             <span
@@ -94,6 +104,9 @@ export function MetricCards({
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Income
             </CardTitle>
+            <CardAction>
+              <MetricInfo metricKey="income" />
+            </CardAction>
           </CardHeader>
           <CardContent>
             <span className="text-2xl font-semibold tabular-nums text-emerald-600">
@@ -107,6 +120,9 @@ export function MetricCards({
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Tracked Expenses
             </CardTitle>
+            <CardAction>
+              <MetricInfo metricKey="trackedExpenses" />
+            </CardAction>
           </CardHeader>
           <CardContent>
             <span className="text-2xl font-semibold tabular-nums text-destructive">
@@ -125,6 +141,9 @@ export function MetricCards({
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Recurring Income
               </CardTitle>
+              <CardAction>
+                <MetricInfo metricKey="recurringIncome" />
+              </CardAction>
             </CardHeader>
             <CardContent>
               <span className="text-2xl font-semibold tabular-nums text-emerald-600">
@@ -138,6 +157,9 @@ export function MetricCards({
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Recurring Expenses
               </CardTitle>
+              <CardAction>
+                <MetricInfo metricKey="recurringExpenses" />
+              </CardAction>
             </CardHeader>
             <CardContent>
               <span className="text-2xl font-semibold tabular-nums text-destructive">
@@ -156,6 +178,9 @@ export function MetricCards({
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Budget Left
               </CardTitle>
+              <CardAction>
+                <MetricInfo metricKey="budgetLeft" />
+              </CardAction>
             </CardHeader>
             <CardContent>
               <span
