@@ -6,6 +6,7 @@ import {
   nextMonthStart,
   monthStartFromKey,
   monthEndFromKey,
+  computeFromRecurringDate,
 } from "@/lib/date";
 import type {
   CreateTransactionInput,
@@ -331,4 +332,94 @@ export async function softDelete(
   `;
 
   return rows.length > 0;
+}
+
+export async function createFromRecurring(
+  workspaceId: string,
+  userId: string,
+  recurringId: string,
+): Promise<TransactionRow> {
+  const transactionId = crypto.randomUUID();
+
+  await sql.begin(async (tx) => {
+    const recurringRows = await tx`
+      SELECT id, name, financial_account_id, type, amount_minor, day_of_month
+      FROM recurring_transaction
+      WHERE id = ${recurringId}
+        AND workspace_id = ${workspaceId}
+        AND archived_at IS NULL
+      LIMIT 1
+    `;
+    if (recurringRows.length === 0) {
+      throw new TransactionError(
+        "NOT_FOUND",
+        "Recurring transaction not found",
+      );
+    }
+    const recurring = recurringRows[0]!;
+
+    const financialAccountId = (recurring.financial_account_id as string | null) ?? null;
+    if (!financialAccountId) {
+      throw new TransactionError(
+        "MISSING_ACCOUNT",
+        "Set a default account on this recurring item first",
+      );
+    }
+
+    const transactionDate = computeFromRecurringDate(
+      Number(recurring.day_of_month),
+      today(),
+    );
+
+    const monthStart = currentMonthStart();
+    const monthEnd = nextMonthStart();
+    const duplicateRows = await tx`
+      SELECT id FROM financial_transaction
+      WHERE recurring_transaction_id = ${recurringId}
+        AND workspace_id = ${workspaceId}
+        AND transaction_date >= ${monthStart}
+        AND transaction_date < ${monthEnd}
+        AND deleted_at IS NULL
+      LIMIT 1
+    `;
+    if (duplicateRows.length > 0) {
+      throw new TransactionError(
+        "ALREADY_ADDED",
+        "A transaction for this recurring item already exists this month",
+      );
+    }
+
+    const accountRows = await tx`
+      SELECT id FROM financial_account
+      WHERE id = ${financialAccountId}
+        AND workspace_id = ${workspaceId}
+        AND archived_at IS NULL
+      LIMIT 1
+    `;
+    if (accountRows.length === 0) {
+      throw new TransactionError(
+        "ACCOUNT_NOT_FOUND",
+        "Account not found or is archived",
+      );
+    }
+
+    await tx`
+      INSERT INTO financial_transaction (
+        id, workspace_id, financial_account_id, name, type,
+        amount_minor, transaction_date, recurring_transaction_id,
+        created_by_user_id, updated_by_user_id
+      ) VALUES (
+        ${transactionId}, ${workspaceId}, ${financialAccountId},
+        ${recurring.name as string}, ${recurring.type as "income" | "expense"},
+        ${recurring.amount_minor as bigint}, ${transactionDate}, ${recurringId},
+        ${userId}, ${userId}
+      )
+    `;
+  });
+
+  const transaction = await getById(transactionId, workspaceId);
+  if (!transaction) {
+    throw new Error("Created transaction could not be loaded");
+  }
+  return transaction;
 }
