@@ -88,7 +88,7 @@ src/client/app/features/shared/month-navigator.tsx             (NEW — extracte
 
   rows: Array<{
     date: string;                         // "YYYY-MM-DD"
-    balances: Record<string, string>;     // accountId → signed minor units as string
+    balances: Record<string, number>;     // accountId → signed minor units (safe integer)
   }>;
   // Sorted DESC by date (newest first). One row per distinct effective_date that
   // has at least one snapshot in the month. Only accounts listed in `accounts`
@@ -96,7 +96,7 @@ src/client/app/features/shared/month-navigator.tsx             (NEW — extracte
   // omitted for the row (client treats it as "carry-forward from prior row").
 
   baseline: {
-    balances: Record<string, string>;     // accountId → signed minor units as string
+    balances: Record<string, number>;     // accountId → signed minor units (safe integer)
   };
   // For each account in `accounts`, the latest snapshot with
   // effective_date < month_start (null/omitted if none exists).
@@ -104,7 +104,7 @@ src/client/app/features/shared/month-navigator.tsx             (NEW — extracte
 }
 ```
 
-**Amounts** are signed minor units (bigint precision) encoded as strings on the wire to survive JSON. Credit-card amounts are already negated before serialization (matches the existing signed-balance convention in `account-balances`). The client parses them back into `bigint`.
+**Amounts** are signed minor units encoded as JavaScript-safe integer `number` on the wire, matching the existing repo convention (`bigintToSafeNumber` → JS number; the safe-integer ceiling is ~9×10¹⁵ minor units, far beyond any personal-finance amount in halers or cents). Credit-card amounts are already negated before serialization (matches the existing signed-balance convention in `account-balances`).
 
 #### DB module — `getMonthMatrix(workspaceId, month)`
 
@@ -215,7 +215,7 @@ No e2e. The repo's existing pattern does not include view-level e2e, so this fol
 - **Archived accounts:** shown as dimmed columns when they have in-month snapshots. Hiding would silently drop audit information.
 - **No URL routing for month:** matches the app's current no-router state model.
 - **No sparkline / CSV / multi-month:** explicitly out of scope. Dashboard already has the chart; export isn't requested.
-- **Response encoding of bigint:** amounts as string on the wire, parsed to `bigint` on the client. Same approach as existing snapshot endpoints.
+- **Response encoding of amounts:** safe-integer `number` on the wire, matching the existing repo convention (`bigintToSafeNumber`). The safe-integer ceiling is effectively unlimited for personal-finance minor units, so string-encoding bigints is unnecessary.
 
 ## Open questions
 
