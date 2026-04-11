@@ -12,9 +12,14 @@ import { TransactionError } from "@/db/modules/transactions";
 
 function domainErrorStatus(code: string): ContentfulStatusCode {
   switch (code) {
+    case "NOT_FOUND":
+      return 404;
+    case "ALREADY_ADDED":
+      return 409;
     case "INVALID_DATE_RANGE":
     case "ACCOUNT_NOT_FOUND":
     case "TRANSACTION_DELETED":
+    case "MISSING_ACCOUNT":
       return 400;
     default:
       return 400;
@@ -74,6 +79,39 @@ export const transactionsRoute = new Hono<AppEnv>()
         userId,
         workspaceId,
         transactionId: transaction.id,
+      });
+
+      return c.json({ transaction }, 201);
+    } catch (err) {
+      if (err instanceof TransactionError) {
+        return c.json(
+          { error: { code: err.code, message: err.message } },
+          domainErrorStatus(err.code),
+        );
+      }
+      throw err;
+    }
+  })
+
+  // ── POST /from-recurring/:id — create transaction from recurring ──
+  .post("/from-recurring/:id", async (c) => {
+    const id = c.req.param("id");
+    const workspaceId = c.get("workspaceId");
+    const userId = c.get("user").id;
+
+    try {
+      const transaction = await transactionsDb.createFromRecurring(
+        workspaceId,
+        userId,
+        id,
+      );
+
+      logger.info("Transaction created from recurring", {
+        requestId: c.get("requestId"),
+        userId,
+        workspaceId,
+        transactionId: transaction.id,
+        recurringTransactionId: id,
       });
 
       return c.json({ transaction }, 201);
