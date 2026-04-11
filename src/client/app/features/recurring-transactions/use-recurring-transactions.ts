@@ -9,6 +9,7 @@ export type RecurringTransaction = {
   amountMinor: number;
   signedAmount: number;
   dayOfMonth: number;
+  addedThisMonth: boolean;
   createdAt: string;
   updatedAt: string;
 };

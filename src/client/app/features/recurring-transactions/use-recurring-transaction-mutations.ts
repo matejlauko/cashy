@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { rpc } from "@/client/rpc";
 import { parseApiError, type AppError } from "@/client/app/lib/api-error";
+import { currentMonthStart } from "@/lib/date";
 import type {
   CreateRecurringTransactionInput,
   UpdateRecurringTransactionInput,
@@ -97,6 +98,47 @@ export function useArchiveRecurringTransaction(workspaceId: string) {
       toast.success("Recurring transaction archived");
     },
     onError: (err: Error) => {
+      toast.error(err.message);
+    },
+  });
+}
+
+export function useAddRecurringToTransactions(workspaceId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (recurringId: string) => {
+      const res = await rpc.api.transactions["from-recurring"][":id"].$post({
+        param: { id: recurringId },
+      });
+      if (!res.ok) {
+        const err = await parseApiError(res);
+        throw Object.assign(new Error(err.message), { code: err.code });
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const monthStart = currentMonthStart();
+      queryClient.invalidateQueries({
+        queryKey: ["transactions", workspaceId, monthStart],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["recurring-transactions", workspaceId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["dashboard", workspaceId],
+      });
+      const name = (data as { transaction: { name: string } }).transaction.name;
+      toast.success(`Added ${name}`);
+    },
+    onError: (err: AppError) => {
+      if (err.code === "ALREADY_ADDED") {
+        queryClient.invalidateQueries({
+          queryKey: ["recurring-transactions", workspaceId],
+        });
+        toast.message("Already added this month");
+        return;
+      }
       toast.error(err.message);
     },
   });
