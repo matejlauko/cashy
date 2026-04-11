@@ -7,6 +7,7 @@ import {
   useCreateRecurringTransaction,
   useUpdateRecurringTransaction,
   useArchiveRecurringTransaction,
+  useAddRecurringToTransactions,
 } from "@/client/app/features/recurring-transactions/use-recurring-transaction-mutations";
 import { RecurringTransactionFormDialog } from "@/client/app/features/recurring-transactions/recurring-transaction-form";
 import { ArchiveConfirmDialog } from "@/client/app/features/recurring-transactions/archive-confirm";
@@ -19,7 +20,7 @@ import { useAccounts } from "@/client/app/features/accounts/use-accounts";
 import { formatMoneyMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Plus, Repeat, Pencil, Archive } from "lucide-react";
+import { Plus, Repeat, Pencil, Archive, Check, Loader2 } from "lucide-react";
 
 interface RecurringViewProps {
   workspaceId: string;
@@ -51,6 +52,7 @@ export function RecurringView({ workspaceId }: RecurringViewProps) {
   const createMutation = useCreateRecurringTransaction(workspaceId);
   const updateMutation = useUpdateRecurringTransaction(workspaceId);
   const archiveMutation = useArchiveRecurringTransaction(workspaceId);
+  const addMutation = useAddRecurringToTransactions(workspaceId);
 
   // Dialog state
   const [formOpen, setFormOpen] = useState(false);
@@ -60,6 +62,7 @@ export function RecurringView({ workspaceId }: RecurringViewProps) {
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archivingItem, setArchivingItem] =
     useState<RecurringTransaction | null>(null);
+  const [addingItemId, setAddingItemId] = useState<string | null>(null);
 
   const handleCreate = () => {
     setEditingItem(null);
@@ -215,6 +218,43 @@ export function RecurringView({ workspaceId }: RecurringViewProps) {
                   {item.type === "income" ? "+" : ""}
                   {formatMoneyMinor(item.signedAmount)}
                 </span>
+                {(() => {
+                  const isAddingThis =
+                    addMutation.isPending && addingItemId === item.id;
+                  const disabled =
+                    isAddingThis ||
+                    item.addedThisMonth ||
+                    !item.financialAccountId;
+                  const tooltip = item.addedThisMonth
+                    ? "Already added this month"
+                    : !item.financialAccountId
+                      ? "Set an account on this recurring item first"
+                      : "Add this month's transaction";
+                  return (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={disabled}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAddingItemId(item.id);
+                        addMutation.mutate(item.id, {
+                          onSettled: () => setAddingItemId(null),
+                        });
+                      }}
+                      aria-label={tooltip}
+                      title={tooltip}
+                    >
+                      {isAddingThis ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : item.addedThisMonth ? (
+                        <Check className="size-4" />
+                      ) : (
+                        <Plus className="size-4" />
+                      )}
+                    </Button>
+                  );
+                })()}
                 <Button
                   variant="ghost"
                   size="icon"
