@@ -131,3 +131,29 @@ export function formatMonthLabel(key: string): string {
     timeZone: "UTC",
   }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
+
+/**
+ * Compute the transaction date when creating a transaction from a recurring
+ * item. Uses the recurring item's day-of-month within the current month, but:
+ * - clamps day-of-month to the actual length of the current month (so day 31
+ *   in a 30-day month becomes day 30, day 31 in February becomes day 28/29),
+ * - then clamps to `today` so the result is never in the future.
+ *
+ * Both `today` and the return value are "YYYY-MM-DD" strings.
+ */
+export function computeFromRecurringDate(
+  dayOfMonth: number,
+  today: string,
+): string {
+  const [year, month, todayDay] = today.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const clampedDay = Math.min(dayOfMonth, daysInMonth);
+  if (clampedDay > todayDay) {
+    return today;
+  }
+  return `${year}-${String(month).padStart(2, "0")}-${String(clampedDay).padStart(2, "0")}`;
+}
