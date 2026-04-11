@@ -190,6 +190,13 @@ export const financialTransaction = pgTable(
     index("financial_transaction_workspace_date_idx")
       .on(t.workspaceId, sql`${t.transactionDate} DESC`)
       .where(sql`${t.deletedAt} is null`),
+    uniqueIndex("financial_transaction_recurring_month_unique")
+      .on(
+        t.workspaceId,
+        sql`${t.recurringTransactionId}`,
+        sql`date_trunc('month', ${t.transactionDate})`,
+      )
+      .where(sql`${t.deletedAt} is null`),
   ],
 );
 

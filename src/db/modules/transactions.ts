@@ -403,18 +403,33 @@ export async function createFromRecurring(
       );
     }
 
-    await tx`
-      INSERT INTO financial_transaction (
-        id, workspace_id, financial_account_id, name, type,
-        amount_minor, transaction_date, recurring_transaction_id,
-        created_by_user_id, updated_by_user_id
-      ) VALUES (
-        ${transactionId}, ${workspaceId}, ${financialAccountId},
-        ${recurring.name as string}, ${recurring.type as "income" | "expense"},
-        ${recurring.amount_minor as bigint}, ${transactionDate}, ${recurringId},
-        ${userId}, ${userId}
-      )
-    `;
+    try {
+      await tx`
+        INSERT INTO financial_transaction (
+          id, workspace_id, financial_account_id, name, type,
+          amount_minor, transaction_date, recurring_transaction_id,
+          created_by_user_id, updated_by_user_id
+        ) VALUES (
+          ${transactionId}, ${workspaceId}, ${financialAccountId},
+          ${recurring.name as string}, ${recurring.type as "income" | "expense"},
+          ${recurring.amount_minor as bigint}, ${transactionDate}, ${recurringId},
+          ${userId}, ${userId}
+        )
+      `;
+    } catch (err) {
+      const pgErr = err as { code?: string; constraint_name?: string; constraint?: string };
+      const constraint = pgErr.constraint_name ?? pgErr.constraint;
+      if (
+        pgErr.code === "23505" &&
+        constraint === "financial_transaction_recurring_month_unique"
+      ) {
+        throw new TransactionError(
+          "ALREADY_ADDED",
+          "A transaction for this recurring item already exists this month",
+        );
+      }
+      throw err;
+    }
   });
 
   const transaction = await getById(transactionId, workspaceId);
