@@ -194,7 +194,7 @@ export const financialTransaction = pgTable(
       .on(
         t.workspaceId,
         sql`${t.recurringTransactionId}`,
-        sql`date_trunc('month', ${t.transactionDate})`,
+        sql`date_trunc('month', ${t.transactionDate}::timestamp)`,
       )
       .where(sql`${t.deletedAt} is null`),
   ],
