@@ -1,4 +1,5 @@
 import { sql } from "@/db/client";
+import { currentMonthStart, nextMonthStart } from "@/lib/date";
 import { bigintToSafeNumber } from "@/lib/money";
 import type {
   CreateRecurringTransactionInput,
@@ -29,6 +30,8 @@ export type RecurringTransactionRow = {
   /** Positive for income, negative for expense */
   signedAmount: number;
   dayOfMonth: number;
+  /** True when a transaction already exists for this recurring item in the current calendar month */
+  addedThisMonth: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -46,6 +49,7 @@ function mapRow(r: Record<string, unknown>): RecurringTransactionRow {
     amountMinor,
     signedAmount: type === "income" ? amountMinor : -amountMinor,
     dayOfMonth: Number(r.day_of_month),
+    addedThisMonth: r.added_this_month === true,
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
   };
@@ -56,14 +60,30 @@ function mapRow(r: Record<string, unknown>): RecurringTransactionRow {
 export async function listActive(
   workspaceId: string,
 ): Promise<RecurringTransactionRow[]> {
+  const monthStart = currentMonthStart();
+  const monthEnd = nextMonthStart();
   const rows = await sql`
     SELECT
-      id, name, financial_account_id, type, amount_minor,
-      day_of_month, created_at, updated_at
-    FROM recurring_transaction
-    WHERE workspace_id = ${workspaceId}
-      AND archived_at IS NULL
-    ORDER BY day_of_month ASC, name ASC
+      rt.id,
+      rt.name,
+      rt.financial_account_id,
+      rt.type,
+      rt.amount_minor,
+      rt.day_of_month,
+      rt.created_at,
+      rt.updated_at,
+      EXISTS (
+        SELECT 1 FROM financial_transaction ft
+        WHERE ft.recurring_transaction_id = rt.id
+          AND ft.workspace_id = rt.workspace_id
+          AND ft.transaction_date >= ${monthStart}
+          AND ft.transaction_date < ${monthEnd}
+          AND ft.deleted_at IS NULL
+      ) AS added_this_month
+    FROM recurring_transaction rt
+    WHERE rt.workspace_id = ${workspaceId}
+      AND rt.archived_at IS NULL
+    ORDER BY rt.day_of_month ASC, rt.name ASC
   `;
   return rows.map(mapRow);
 }
@@ -72,14 +92,30 @@ export async function getById(
   id: string,
   workspaceId: string,
 ): Promise<RecurringTransactionRow | null> {
+  const monthStart = currentMonthStart();
+  const monthEnd = nextMonthStart();
   const rows = await sql`
     SELECT
-      id, name, financial_account_id, type, amount_minor,
-      day_of_month, created_at, updated_at
-    FROM recurring_transaction
-    WHERE id = ${id}
-      AND workspace_id = ${workspaceId}
-      AND archived_at IS NULL
+      rt.id,
+      rt.name,
+      rt.financial_account_id,
+      rt.type,
+      rt.amount_minor,
+      rt.day_of_month,
+      rt.created_at,
+      rt.updated_at,
+      EXISTS (
+        SELECT 1 FROM financial_transaction ft
+        WHERE ft.recurring_transaction_id = rt.id
+          AND ft.workspace_id = rt.workspace_id
+          AND ft.transaction_date >= ${monthStart}
+          AND ft.transaction_date < ${monthEnd}
+          AND ft.deleted_at IS NULL
+      ) AS added_this_month
+    FROM recurring_transaction rt
+    WHERE rt.id = ${id}
+      AND rt.workspace_id = ${workspaceId}
+      AND rt.archived_at IS NULL
   `;
   if (rows.length === 0) return null;
   return mapRow(rows[0]!);
