@@ -162,6 +162,7 @@ export const financialTransaction = pgTable(
     type: transactionTypeEnum("type").notNull(),
     amountMinor: bigint("amount_minor", { mode: "bigint" }).notNull(),
     transactionDate: date("transaction_date").notNull(),
+    recurringTransactionId: text("recurring_transaction_id"),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deletedByUserId: text("deleted_by_user_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -180,6 +181,11 @@ export const financialTransaction = pgTable(
       foreignColumns: [financialAccount.id, financialAccount.workspaceId],
       name: "financial_transaction_account_workspace_fk",
     }),
+    foreignKey({
+      columns: [t.recurringTransactionId, t.workspaceId],
+      foreignColumns: [recurringTransaction.id, recurringTransaction.workspaceId],
+      name: "financial_transaction_recurring_workspace_fk",
+    }).onDelete("set null"),
     // Partial index: active transactions by workspace and date
     index("financial_transaction_workspace_date_idx")
       .on(t.workspaceId, sql`${t.transactionDate} DESC`)
@@ -212,6 +218,8 @@ export const recurringTransaction = pgTable(
     updatedByUserId: text("updated_by_user_id").notNull(),
   },
   (t) => [
+    // Composite unique needed as FK target for workspace isolation
+    unique("recurring_transaction_id_workspace_unique").on(t.workspaceId, t.id),
     // Composite FK: workspace isolation (nullable – account is optional)
     foreignKey({
       columns: [t.financialAccountId, t.workspaceId],
