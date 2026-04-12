@@ -145,6 +145,7 @@ export function BalanceHistoryTable({ data, onEditRow }: BalanceHistoryTableProp
               }}
               tabIndex={0}
               role="button"
+              aria-label={`Edit balances for ${row.date}`}
               className={cn(
                 "cursor-pointer border-t outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent/60",
                 rowIdx % 2 === 1 && "bg-muted/20",
