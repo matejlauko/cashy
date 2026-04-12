@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { rpc } from "@/client/rpc";
 import { parseApiError, type AppError } from "@/client/app/lib/api-error";
 import { currentMonthStart } from "@/lib/date";
+import { formatMoneyMinor } from "@/lib/money";
 import type {
   CreateRecurringTransactionInput,
   UpdateRecurringTransactionInput,
@@ -128,8 +129,8 @@ export function useAddRecurringToTransactions(workspaceId: string) {
       queryClient.invalidateQueries({
         queryKey: ["dashboard", workspaceId],
       });
-      const name = (data as { transaction: { name: string } }).transaction.name;
-      toast.success(`Added ${name}`);
+      const t = (data as { transaction: { name: string; amountMinor: number } }).transaction;
+      toast.success(`Added ${t.name} — ${formatMoneyMinor(t.amountMinor)}`);
     },
     onError: (err: AppError) => {
       if (err.code === "ALREADY_ADDED") {

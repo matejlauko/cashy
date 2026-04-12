@@ -239,7 +239,10 @@ export function RecurringView({ workspaceId }: RecurringViewProps) {
                         e.stopPropagation();
                         setAddingItemId(item.id);
                         addMutation.mutate(item.id, {
-                          onSettled: () => setAddingItemId(null),
+                          onSettled: () =>
+                            setAddingItemId((prev) =>
+                              prev === item.id ? null : prev,
+                            ),
                         });
                       }}
                       aria-label={tooltip}
