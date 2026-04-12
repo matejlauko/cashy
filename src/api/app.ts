@@ -13,6 +13,7 @@ import { sessionRoute } from "@/api/routes/session";
 import { workspacesRoute } from "@/api/routes/workspaces";
 import { accountsRoute } from "@/api/routes/accounts";
 import { balanceSnapshotsRoute } from "@/api/routes/balance-snapshots";
+import { balanceHistoryRoute } from "@/api/routes/balance-history";
 import { transactionsRoute } from "@/api/routes/transactions";
 import { dashboardRoute } from "@/api/routes/dashboard";
 import { recurringTransactionsRoute } from "@/api/routes/recurring-transactions";
@@ -46,6 +47,8 @@ app.use("/accounts", sessionMiddleware, workspaceMiddleware);
 app.use("/accounts/*", sessionMiddleware, workspaceMiddleware);
 app.use("/balance-snapshots", sessionMiddleware, workspaceMiddleware);
 app.use("/balance-snapshots/*", sessionMiddleware, workspaceMiddleware);
+app.use("/balance-history", sessionMiddleware, workspaceMiddleware);
+app.use("/balance-history/*", sessionMiddleware, workspaceMiddleware);
 app.use("/transactions", sessionMiddleware, workspaceMiddleware);
 app.use("/transactions/*", sessionMiddleware, workspaceMiddleware);
 app.use("/dashboard", sessionMiddleware, workspaceMiddleware);
@@ -61,6 +64,7 @@ const routes = app
   .route("/workspaces", workspacesRoute)
   .route("/accounts", accountsRoute)
   .route("/balance-snapshots", balanceSnapshotsRoute)
+  .route("/balance-history", balanceHistoryRoute)
   .route("/transactions", transactionsRoute)
   .route("/dashboard", dashboardRoute)
   .route("/recurring-transactions", recurringTransactionsRoute)
