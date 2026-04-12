@@ -24,6 +24,9 @@ export function useBulkBalanceUpdate(workspaceId: string) {
       queryClient.invalidateQueries({
         queryKey: ["balance-prefill", workspaceId],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["balance-history", workspaceId],
+      });
       toast.success("Balances updated");
     },
     onError: (err: Error) => {

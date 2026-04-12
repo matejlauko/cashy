@@ -22,6 +22,7 @@ interface BalanceUpdateFormDialogProps {
   onOpenChange: (open: boolean) => void;
   workspaceId: string;
   onCreateAccount?: () => void;
+  initialDate?: string;
 }
 
 export function BalanceUpdateFormDialog({
@@ -29,8 +30,9 @@ export function BalanceUpdateFormDialog({
   onOpenChange,
   workspaceId,
   onCreateAccount,
+  initialDate,
 }: BalanceUpdateFormDialogProps) {
-  const [date, setDate] = useState(today());
+  const [date, setDate] = useState(initialDate ?? today());
   const prefillQuery = useBalancePrefill(workspaceId, date);
   const bulkMutation = useBulkBalanceUpdate(workspaceId);
 
@@ -54,10 +56,10 @@ export function BalanceUpdateFormDialog({
   // Reset form state when dialog opens
   useEffect(() => {
     if (open) {
-      setDate(today());
+      setDate(initialDate ?? today());
       setFormError(null);
     }
-  }, [open]);
+  }, [open, initialDate]);
 
   const handleValueChange = (accountId: string, value: string) => {
     setValues((prev) => ({ ...prev, [accountId]: value }));
@@ -118,9 +120,13 @@ export function BalanceUpdateFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Update Balances</DialogTitle>
+          <DialogTitle>
+            {initialDate ? "Edit balances" : "Update Balances"}
+          </DialogTitle>
           <DialogDescription>
-            Enter current balances for all active accounts.
+            {initialDate
+              ? `Edit balances recorded for ${initialDate}. Saving creates a new snapshot that supersedes the previous one.`
+              : "Enter current balances for all active accounts."}
           </DialogDescription>
         </DialogHeader>
 
@@ -165,6 +171,7 @@ export function BalanceUpdateFormDialog({
                 max={today()}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
+                disabled={initialDate !== undefined}
               />
             </div>
 
