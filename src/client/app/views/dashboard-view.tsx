@@ -4,7 +4,7 @@ import { MetricCards } from "@/client/app/features/dashboard/metric-cards";
 // import { BalanceChart } from "@/client/app/features/dashboard/balance-chart";
 import { AccountBalances } from "@/client/app/features/dashboard/account-balances";
 import { RecentTransactions } from "@/client/app/features/dashboard/recent-transactions";
-import { MonthNavigator } from "@/client/app/features/dashboard/month-navigator";
+import { MonthNavigator } from "@/client/app/features/shared/month-navigator";
 import { BalanceUpdateFormDialog } from "@/client/app/features/balance-snapshots/balance-update-form";
 import { currentMonthKey, monthStartFromKey, formatDisplayDate } from "@/lib/date";
 import { Button } from "@/components/ui/button";
