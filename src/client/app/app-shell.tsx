@@ -15,6 +15,7 @@ import {
   LogOut,
   LayoutDashboard,
   Wallet,
+  History,
   ArrowLeftRight,
   Repeat,
   PiggyBank,
@@ -24,8 +25,9 @@ import { AccountsView } from "./views/accounts-view";
 import { TransactionsView } from "./views/transactions-view";
 import { RecurringView } from "./views/recurring-view";
 import { BudgetView } from "./views/budget-view";
+import { BalanceHistoryView } from "./views/balance-history-view";
 
-type Section = "dashboard" | "accounts" | "transactions" | "recurring" | "budget";
+type Section = "dashboard" | "accounts" | "balance-history" | "transactions" | "recurring" | "budget";
 type SessionBootstrap = {
   user: {
     id: string;
@@ -41,6 +43,7 @@ type ApiErrorPayload = { error?: { message?: string } };
 const sections: { id: Section; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "accounts", label: "Accounts" },
+  { id: "balance-history", label: "Balance history" },
   { id: "transactions", label: "Transactions" },
   { id: "recurring", label: "Recurring" },
   { id: "budget", label: "Budget" },
@@ -49,6 +52,7 @@ const sections: { id: Section; label: string }[] = [
 const navIcons = {
   dashboard: LayoutDashboard,
   accounts: Wallet,
+  "balance-history": History,
   transactions: ArrowLeftRight,
   recurring: Repeat,
   budget: PiggyBank,
@@ -367,6 +371,12 @@ export function AppShell() {
         )}
         {activeSection === "accounts" && (
           <AccountsView workspaceId={session.activeWorkspaceId} />
+        )}
+        {activeSection === "balance-history" && (
+          <BalanceHistoryView
+            workspaceId={session.activeWorkspaceId}
+            onNavigate={handleSectionChange}
+          />
         )}
         {activeSection === "transactions" && (
           <TransactionsView
