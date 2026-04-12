@@ -1,6 +1,6 @@
 import { sql } from "@/db/client";
 import { bigintToSafeNumber } from "@/lib/money";
-import { today } from "@/lib/date";
+import { nextMonthKey, today } from "@/lib/date";
 import type { BulkBalanceUpdateInput } from "@/schemas/balance-snapshots";
 
 // ─── Domain error ────────────────────────────────────────────────────────────
@@ -22,6 +22,26 @@ export type PrefillRow = {
   accountName: string;
   accountType: "cash" | "checking" | "savings" | "credit_card";
   amountMinorRaw: number;
+};
+
+// ─── Balance history (monthly matrix) ────────────────────────────────────────
+
+export type BalanceHistoryAccount = {
+  id: string;
+  name: string;
+  type: "cash" | "checking" | "savings" | "credit_card";
+  archivedAt: string | null;
+};
+
+export type BalanceHistoryRow = {
+  date: string; // YYYY-MM-DD
+  balances: Record<string, number>; // accountId → signed minor units (safe int)
+};
+
+export type BalanceHistoryMatrix = {
+  accounts: BalanceHistoryAccount[];
+  rows: BalanceHistoryRow[];
+  baseline: { balances: Record<string, number> };
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -62,6 +82,127 @@ export async function getPrefillByDate(
     ORDER BY fa.name ASC
   `;
   return rows.map(mapPrefillRow);
+}
+
+export async function getMonthMatrix(
+  workspaceId: string,
+  month: string, // "YYYY-MM"
+): Promise<BalanceHistoryMatrix> {
+  const monthStart = `${month}-01`;
+  const nextMonthStart = `${nextMonthKey(month)}-01`;
+
+  // 1) Accounts with ≥1 snapshot whose effective_date falls in [monthStart, nextMonthStart)
+  const accountRows = await sql`
+    SELECT DISTINCT
+      fa.id,
+      fa.name,
+      fa.type,
+      fa.archived_at
+    FROM financial_account fa
+    INNER JOIN balance_snapshot bs
+      ON bs.financial_account_id = fa.id
+     AND bs.workspace_id = fa.workspace_id
+    WHERE fa.workspace_id = ${workspaceId}
+      AND bs.workspace_id = ${workspaceId}
+      AND bs.effective_date >= ${monthStart}
+      AND bs.effective_date < ${nextMonthStart}
+    ORDER BY (fa.archived_at IS NOT NULL), fa.name
+  `;
+
+  const accounts: BalanceHistoryAccount[] = accountRows.map(
+    (r: Record<string, unknown>) => ({
+      id: r.id as string,
+      name: r.name as string,
+      type: r.type as BalanceHistoryAccount["type"],
+      archivedAt: (r.archived_at as string | null) ?? null,
+    }),
+  );
+
+  // Early return when there is no activity in the month.
+  if (accounts.length === 0) {
+    return {
+      accounts: [],
+      rows: [],
+      baseline: { balances: {} },
+    };
+  }
+
+  // 2) In-month snapshots: latest per (account, effective_date)
+  //    Signed amount applied at SQL level (credit_card → negate) to match
+  //    accounts.ts convention.
+  const matrixRows = await sql`
+    SELECT DISTINCT ON (bs.financial_account_id, bs.effective_date)
+      bs.financial_account_id,
+      bs.effective_date,
+      CASE WHEN fa.type = 'credit_card' THEN -bs.amount_minor_raw
+           ELSE bs.amount_minor_raw
+      END AS signed_amount_minor_raw
+    FROM balance_snapshot bs
+    INNER JOIN financial_account fa
+      ON fa.id = bs.financial_account_id
+     AND fa.workspace_id = bs.workspace_id
+    WHERE bs.workspace_id = ${workspaceId}
+      AND bs.effective_date >= ${monthStart}
+      AND bs.effective_date < ${nextMonthStart}
+    ORDER BY
+      bs.financial_account_id,
+      bs.effective_date,
+      bs.created_at DESC,
+      bs.id DESC
+  `;
+
+  // Pivot into rows grouped by date, newest-first.
+  const accountIdSet = new Set(accounts.map((a) => a.id));
+  const byDate = new Map<string, Record<string, number>>();
+  for (const r of matrixRows as Record<string, unknown>[]) {
+    const accountId = r.financial_account_id as string;
+    if (!accountIdSet.has(accountId)) continue;
+    const date = r.effective_date as string;
+    const signed = bigintToSafeNumber(r.signed_amount_minor_raw as bigint);
+    if (!byDate.has(date)) byDate.set(date, {});
+    byDate.get(date)![accountId] = signed;
+  }
+
+  const rows: BalanceHistoryRow[] = [...byDate.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0)) // DESC
+    .map(([date, balances]) => ({ date, balances }));
+
+  // 3) Baseline: latest snapshot per account with effective_date < monthStart,
+  //    signed. Uses all accounts in the workspace; app-code filter keeps only
+  //    those present in `accounts` to keep the payload minimal.
+  const baselineRows = await sql`
+    SELECT DISTINCT ON (bs.financial_account_id)
+      bs.financial_account_id,
+      CASE WHEN fa.type = 'credit_card' THEN -bs.amount_minor_raw
+           ELSE bs.amount_minor_raw
+      END AS signed_amount_minor_raw
+    FROM balance_snapshot bs
+    INNER JOIN financial_account fa
+      ON fa.id = bs.financial_account_id
+     AND fa.workspace_id = bs.workspace_id
+    WHERE bs.workspace_id = ${workspaceId}
+      AND bs.effective_date < ${monthStart}
+    ORDER BY
+      bs.financial_account_id,
+      bs.effective_date DESC,
+      bs.created_at DESC,
+      bs.id DESC
+  `;
+
+  const baselineBalances: Record<string, number> = {};
+  for (const r of baselineRows as Record<string, unknown>[]) {
+    const id = r.financial_account_id as string;
+    if (!accountIdSet.has(id)) continue;
+    baselineBalances[id] = bigintToSafeNumber(
+      r.signed_amount_minor_raw as bigint,
+    );
+  }
+
+  return {
+    accounts,
+    rows,
+    baseline: { balances: baselineBalances },
+  };
 }
 
 // ─── Mutations ───────────────────────────────────────────────────────────────
