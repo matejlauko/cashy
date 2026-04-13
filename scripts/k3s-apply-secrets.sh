@@ -2,11 +2,20 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NAMESPACE="${NAMESPACE:-cashy}"
+
+ENV="${ENV:-production}"
+ENV_FILE="${ROOT_DIR}/ops/k8s/env.${ENV}.sh"
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "Unknown environment '${ENV}'. Missing ${ENV_FILE}."
+  exit 1
+fi
+
+# shellcheck source=/dev/null
+source "${ENV_FILE}"
+
 APP_SECRET_NAME="${APP_SECRET_NAME:-cashy-app}"
 POSTGRES_SECRET_NAME="${POSTGRES_SECRET_NAME:-postgres-credentials}"
-APP_ENV_FILE="${APP_ENV_FILE:-${ROOT_DIR}/ops/k8s/app.env}"
-POSTGRES_ENV_FILE="${POSTGRES_ENV_FILE:-${ROOT_DIR}/ops/k8s/postgres.env}"
 
 if [[ ! -f "${APP_ENV_FILE}" ]]; then
   echo "Missing ${APP_ENV_FILE}. Copy ops/k8s/app.env.example first."
@@ -18,7 +27,7 @@ if [[ ! -f "${POSTGRES_ENV_FILE}" ]]; then
   exit 1
 fi
 
-kubectl apply -f "${ROOT_DIR}/ops/k8s/namespace.yaml"
+kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl -n "${NAMESPACE}" create secret generic "${POSTGRES_SECRET_NAME}" \
   --from-env-file="${POSTGRES_ENV_FILE}" \

@@ -2,19 +2,19 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: cashy-app
-  namespace: cashy
+  namespace: ${NAMESPACE}
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-production
     traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
-    traefik.ingress.kubernetes.io/router.middlewares: cashy-https-redirect@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: ${NAMESPACE}-https-redirect@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - cashy.lauko.io
+        - ${APP_HOST}
       secretName: cashy-app-tls
   rules:
-    - host: cashy.lauko.io
+    - host: ${APP_HOST}
       http:
         paths:
           - path: /

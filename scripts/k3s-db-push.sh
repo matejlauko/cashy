@@ -2,8 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NAMESPACE="${NAMESPACE:-cashy}"
-APP_ENV_FILE="${APP_ENV_FILE:-${ROOT_DIR}/ops/k8s/app.env}"
+
+ENV="${ENV:-production}"
+ENV_FILE="${ROOT_DIR}/ops/k8s/env.${ENV}.sh"
+if [[ ! -f "${ENV_FILE}" ]]; then echo "Unknown environment '${ENV}'."; exit 1; fi
+# shellcheck source=/dev/null
+source "${ENV_FILE}"
 LOCAL_PORT="${LOCAL_PORT:-15432}"
 PORT_FORWARD_LOG="${PORT_FORWARD_LOG:-/tmp/cashy-k3s-port-forward.log}"
 

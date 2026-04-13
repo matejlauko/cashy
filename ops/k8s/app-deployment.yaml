@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cashy-app
-  namespace: cashy
+  namespace: ${NAMESPACE}
   labels:
     app: cashy-app
 spec:
