@@ -108,7 +108,7 @@ export function BalanceHistoryTable({ data, onEditRow }: BalanceHistoryTableProp
       <table className="w-full min-w-max border-collapse text-sm">
         <thead className="bg-muted/50">
           <tr>
-            <th className="sticky left-0 z-10 bg-muted/50 px-3 py-2 text-left font-medium">
+            <th className="sticky left-0 z-10 bg-muted px-3 py-2 text-left font-medium">
               Date
             </th>
             {data.accounts.map((account) => (
@@ -147,12 +147,17 @@ export function BalanceHistoryTable({ data, onEditRow }: BalanceHistoryTableProp
               role="button"
               aria-label={`Edit balances for ${row.date}`}
               className={cn(
-                "cursor-pointer border-t outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent/60",
+                "group cursor-pointer border-t outline-none transition-colors hover:bg-accent/50 focus-visible:bg-accent/60",
                 rowIdx % 2 === 1 && "bg-muted/20",
               )}
             >
-              <td className="sticky left-0 z-10 bg-inherit px-3 py-2 font-mono text-xs">
-                {row.date}
+              <td
+                className={cn(
+                  "sticky left-0 z-10 px-3 py-2 font-mono text-xs transition-colors group-hover:bg-accent/50 group-focus-visible:bg-accent/60",
+                  rowIdx % 2 === 1 ? "bg-muted" : "bg-background",
+                )}
+              >
+                {new Date(row.date).toLocaleDateString("cs-CZ")}
               </td>
               {data.accounts.map((account) => {
                 const cell = row.cells[account.id]!;
@@ -200,7 +205,7 @@ export function BalanceHistoryTable({ data, onEditRow }: BalanceHistoryTableProp
           <tfoot>
             <tr className="border-t bg-muted/40">
               <td
-                className="sticky left-0 z-10 bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground"
+                className="sticky left-0 z-10 bg-muted px-3 py-2 text-xs font-medium text-muted-foreground"
                 colSpan={data.accounts.length + 1}
               >
                 Change this month

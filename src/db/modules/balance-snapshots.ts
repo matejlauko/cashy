@@ -106,7 +106,7 @@ export async function getMonthMatrix(
       AND bs.workspace_id = ${workspaceId}
       AND bs.effective_date >= ${monthStart}
       AND bs.effective_date < ${nextMonthStart}
-    ORDER BY (fa.archived_at IS NOT NULL), fa.name
+    ORDER BY fa.archived_at ASC NULLS FIRST, fa.name
   `;
 
   const accounts: BalanceHistoryAccount[] = accountRows.map(
@@ -133,7 +133,7 @@ export async function getMonthMatrix(
   const matrixRows = await sql`
     SELECT DISTINCT ON (bs.financial_account_id, bs.effective_date)
       bs.financial_account_id,
-      bs.effective_date,
+      bs.effective_date::text AS effective_date,
       CASE WHEN fa.type = 'credit_card' THEN -bs.amount_minor_raw
            ELSE bs.amount_minor_raw
       END AS signed_amount_minor_raw
