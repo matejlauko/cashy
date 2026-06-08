@@ -33,3 +33,5 @@ ops/k8s/*.env
 
 # Finder (MacOS) folder config
 .DS_Store
+
+/backups/
