@@ -43,7 +43,7 @@ Global flags: --api-url <url>, --token <token>, --json
 1. **better-auth `apiKey` plugin** in `src/auth/auth.ts`, with sessions-from-API-keys enabled so a valid `x-api-key` header is treated as a session. The existing `sessionMiddleware` then authenticates CLI requests unchanged. The plugin's `apikey` table is added to the drizzle auth schema (`src/db/schema/auth.ts`) and pushed with `db:push`. The existing workspace middleware's first-workspace fallback covers the missing workspace cookie (its `setCookie` on API responses is harmless to the CLI).
 2. **Token page** at `/cli/auth?port=<n>` — a new small HTML entry (like `login.html`) served session-protected the same way `/` is (unauthenticated → redirect to `/login` and back). The page shows what is being authorized and an **Authorize** button. On click it:
    - creates an API key via the better-auth client (name `cli-<hostname>-<YYYY-MM-DD>`; hostname passed as a `name` query param),
-   - `POST`s the raw key to `http://127.0.0.1:<port>/` via fetch,
+   - `POST`s `<state>\n<key>` to `http://127.0.0.1:<port>/` via fetch (`state` is a nonce the CLI generated and put in the URL; the loopback server rejects mismatched nonces so another local page can't inject a token),
    - on success shows "Logged in — you can close this tab";
    - if the loopback POST fails (headless/SSH), it displays the key once with copy instructions for `cashy auth login --manual`.
 
@@ -51,8 +51,8 @@ Global flags: --api-url <url>, --token <token>, --json
 
 `cashy auth login`:
 
-1. Starts a temporary `Bun.serve` on `127.0.0.1` with a random port.
-2. Opens the browser at `{apiUrl}/cli/auth?port=<port>&name=<hostname>` (`--no-open` prints the URL instead).
+1. Starts a temporary `Bun.serve` on `127.0.0.1` with a random port and generates a `state` nonce.
+2. Opens the browser at `{apiUrl}/cli/auth?port=<port>&state=<nonce>&name=<hostname>` (`--no-open` prints the URL instead).
 3. Receives the token via the loopback POST, verifies it with `GET /api/session` sending `x-api-key`, writes `~/.config/cashy/config.json` (0600), shuts the server down.
 
 `--manual` skips the server and prompts for API URL + token (verified the same way). `auth whoami` calls `GET /api/session` and prints user + workspace. `auth logout` deletes the stored token from config (server-side key revocation is out of scope; keys are managed via the app/better-auth if needed).
