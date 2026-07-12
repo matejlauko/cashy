@@ -3,6 +3,7 @@ import { auth } from "@/auth/auth";
 import { sql } from "@/db/client";
 import { env } from "@/env";
 import { logger } from "@/logger";
+import cliAuth from "./cli-auth.html";
 import index from "./index.html";
 import login from "./login.html";
 
@@ -19,6 +20,7 @@ server = Bun.serve({
     // "/_login": login,
     "/": index,
     "/login": login,
+    "/cli/auth": cliAuth,
 
     "/healthz": new Response("OK"),
 
