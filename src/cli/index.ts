@@ -36,8 +36,9 @@ program
 import { registerStatusCommand } from "./commands/status";
 import { registerBalanceCommands } from "./commands/balance";
 import { registerImportCommand } from "./commands/import";
+import { registerAuthCommands } from "./commands/auth";
 
-// registerAuthCommands(program); // added in a later task
+registerAuthCommands(program);
 registerStatusCommand(program);
 registerBalanceCommands(program);
 registerImportCommand(program);
