@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot src/index.ts",
+    "cashy": "bun src/cli/index.ts",
     "start": "NODE_ENV=production bun src/index.ts",
     "build": "bun run build.ts",
     "db:push": "bunx drizzle-kit push",
@@ -22,6 +23,7 @@
     "bun-plugin-tailwind": "^0.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "commander": "^15.0.0",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.12.8",
     "lucide-react": "^0.577.0",
