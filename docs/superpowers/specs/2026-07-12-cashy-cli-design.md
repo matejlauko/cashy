@@ -61,6 +61,10 @@ All CLI requests send the token as `x-api-key`.
 
 ## Balance updates
 
+### Amendment (2026-07-12)
+
+The bulk snapshots endpoint enforces a `SNAPSHOT_ACCOUNT_MISMATCH` invariant: every request must cover the *full* set of active accounts for that date. The CLI therefore fetches `GET /api/balance-snapshots/prefill?date=<date>` and merges its carry-forward rows (each account's most recent balance) with the explicitly-set snapshots — specified values win, unspecified accounts are filled at their existing balances. `balance set` prints "(n account(s) carried forward at existing balances)" and `import` appends "(+n carried forward)" per date. This keeps writes valid while letting users specify only the accounts they care about.
+
 ### `cashy balance set`
 
 `cashy balance set Checking=1234.56 "Air Bank"=42 --date 2026-07-10`
@@ -168,3 +172,4 @@ The API endpoints themselves are already covered by existing app tests; the toke
 | Amount format | Major units, ≤ 2 decimals | Human-friendly for typing and CSV authoring |
 | Empty import cells | Skipped | Sparse imports — fill in only what you know |
 | Packaging | `src/cli/` + commander | Single-package repo; commander gives help/subcommands cheaply |
+| Prefill/carry-forward | CLI merges `GET /balance-snapshots/prefill` before each bulk write | Bulk API's `SNAPSHOT_ACCOUNT_MISMATCH` invariant needs the full active account set; carry-forward lets users specify only what they care about |

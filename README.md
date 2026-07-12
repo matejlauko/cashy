@@ -56,6 +56,42 @@ Bundles frontend assets into `dist/`.
 bun start
 ```
 
+## CLI
+
+Thin terminal client over the `/api/*` HTTP API. Run from this repo:
+
+```bash
+bun run cashy auth login          # browser flow; --manual to paste a token
+bun run cashy auth whoami
+bun run cashy status [--month YYYY-MM]
+bun run cashy balance set Checking=1234.56 "Air Bank"=42 [--date YYYY-MM-DD]
+bun run cashy import balances.csv # or .json
+bun run cashy auth logout
+```
+
+Global flags: `--api-url`, `--token`, `--json`. Config resolution: flags →
+`CASHY_API_URL`/`CASHY_TOKEN` env → `~/.config/cashy/config.json` (0600).
+Amounts are major units with ≤ 2 decimals. Exit codes: 0 ok, 1 network, 2
+validation, 3 unauthorized, 4 not found.
+
+Import file formats (accounts by name or id, empty cells skipped, one API
+write per date, oldest first; re-running is safe):
+
+```csv
+date,Checking,Savings
+2026-07-01,1234.56,9000
+2026-07-08,1100.20,
+```
+
+```json
+{ "2026-07-01": { "Checking": 1234.56, "Savings": 9000 } }
+```
+
+Each write covers the full active account set, so any accounts you don't
+specify for a date are carried forward at their existing balances (`balance
+set` reports "(n account(s) carried forward…)", `import` appends "(+n carried
+forward)").
+
 ## Docker
 
 ### Build
