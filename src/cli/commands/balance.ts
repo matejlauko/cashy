@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { makeClient, fail } from "../index";
 import { parseMajorAmount, formatMinor } from "../lib/amounts";
 import { resolveAccountRef, accountListHint } from "../lib/accounts";
+import { mergeWithPrefill } from "../lib/prefill";
 import { today, isDateString } from "@/lib/date";
 
 export function registerBalanceCommands(program: Command): void {
@@ -71,12 +72,17 @@ export function registerBalanceCommands(program: Command): void {
           process.exit(2);
         }
 
+        const prefill = await client.getPrefill(effectiveDate);
+        const merged = mergeWithPrefill(snapshots, prefill);
+
         const result = await client.bulkSnapshots({
           effectiveDate,
-          snapshots: snapshots.map(({ financialAccountId, amountMinorRaw }) => ({
-            financialAccountId,
-            amountMinorRaw,
-          })),
+          snapshots: merged.snapshots.map(
+            ({ financialAccountId, amountMinorRaw }) => ({
+              financialAccountId,
+              amountMinorRaw,
+            }),
+          ),
         });
 
         if (program.opts().json) {
@@ -86,6 +92,11 @@ export function registerBalanceCommands(program: Command): void {
         for (const snap of snapshots) {
           console.log(
             `${snap.accountName}: ${formatMinor(snap.amountMinorRaw)} @ ${effectiveDate}`,
+          );
+        }
+        if (merged.carriedForward.length > 0) {
+          console.log(
+            `(${merged.carriedForward.length} account(s) carried forward at existing balances)`,
           );
         }
       } catch (err) {

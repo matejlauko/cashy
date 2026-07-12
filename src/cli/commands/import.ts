@@ -3,6 +3,7 @@ import type { Command } from "commander";
 import { makeClient, fail } from "../index";
 import { ApiError } from "../client";
 import { parseImportFile, buildDatePlans } from "../lib/import-matrix";
+import { mergeWithPrefill } from "../lib/prefill";
 import { formatMinor } from "../lib/amounts";
 import { today } from "@/lib/date";
 
@@ -44,10 +45,14 @@ export function registerImportCommand(program: Command): void {
 
         const applied: string[] = [];
         for (const plan of plans) {
+          let carriedForward = 0;
           try {
+            const prefill = await client.getPrefill(plan.date);
+            const merged = mergeWithPrefill(plan.snapshots, prefill);
+            carriedForward = merged.carriedForward.length;
             await client.bulkSnapshots({
               effectiveDate: plan.date,
-              snapshots: plan.snapshots.map(
+              snapshots: merged.snapshots.map(
                 ({ financialAccountId, amountMinorRaw }) => ({
                   financialAccountId,
                   amountMinorRaw,
@@ -72,7 +77,7 @@ export function registerImportCommand(program: Command): void {
           console.log(
             `${plan.date}: ${plan.snapshots
               .map((s) => `${s.accountName} ${formatMinor(s.amountMinorRaw)}`)
-              .join(", ")}`,
+              .join(", ")}${carriedForward > 0 ? ` (+${carriedForward} carried forward)` : ""}`,
           );
         }
         console.log(`\nImported ${applied.length} date(s).`);

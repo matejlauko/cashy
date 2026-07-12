@@ -11,6 +11,13 @@ export class ApiError extends Error {
 
 export type ApiAccount = { id: string; name: string; type: string };
 
+export type PrefillRow = {
+  financialAccountId: string;
+  accountName: string;
+  accountType: string;
+  amountMinorRaw: number;
+};
+
 export type BulkInput = {
   effectiveDate: string;
   snapshots: { financialAccountId: string; amountMinorRaw: number }[];
@@ -110,6 +117,14 @@ export class CashyClient {
 
   bulkSnapshots(input: BulkInput): Promise<unknown> {
     return this.request("POST", "/api/balance-snapshots/bulk", input);
+  }
+
+  async getPrefill(date: string): Promise<PrefillRow[]> {
+    const data = await this.request<{ prefill: PrefillRow[] }>(
+      "GET",
+      `/api/balance-snapshots/prefill?date=${encodeURIComponent(date)}`,
+    );
+    return data.prefill;
   }
 
   getDashboard(month?: string): Promise<DashboardResponse> {
