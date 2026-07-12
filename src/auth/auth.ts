@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
+import { apiKey } from "@better-auth/api-key";
 import { drizzleDb } from "@/db/drizzle";
 import { sql } from "@/db/client";
 import * as schema from "@/db/schema/auth";
@@ -19,6 +20,7 @@ export const auth = betterAuth({
       account: schema.userAccount,
       session: schema.session,
       verification: schema.verification,
+      apikey: schema.apikey,
     },
   }),
   socialProviders: {
@@ -33,6 +35,15 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 45, // 45 days
     updateAge: 60 * 60 * 24, // 1 day
   },
+  plugins: [
+    apiKey({
+      enableSessionForAPIKeys: true,
+      // Plugin default is 10 requests/24h per key — far too low for the CLI
+      // (bulk import makes one request per date). Server-level rate limiting
+      // is unaffected by this.
+      rateLimit: { enabled: false },
+    }),
+  ],
   user: {
     additionalFields: {
       googleSub: {
