@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { Command } from "commander";
 import { makeClient, fail } from "../index";
-import { ApiError } from "../client";
+import { ApiError, exitCodeForError } from "../client";
 import { parseImportFile, buildDatePlans } from "../lib/import-matrix";
 import { mergeWithPrefill } from "../lib/prefill";
 import { formatMinor } from "../lib/amounts";
@@ -43,14 +43,16 @@ export function registerImportCommand(program: Command): void {
           return;
         }
 
+        const asJson = Boolean(program.opts().json);
         const applied: string[] = [];
         for (const plan of plans) {
           let carriedForward = 0;
+          let response: unknown;
           try {
             const prefill = await client.getPrefill(plan.date);
             const merged = mergeWithPrefill(plan.snapshots, prefill);
             carriedForward = merged.carriedForward.length;
-            await client.bulkSnapshots({
+            response = await client.bulkSnapshots({
               effectiveDate: plan.date,
               snapshots: merged.snapshots.map(
                 ({ financialAccountId, amountMinorRaw }) => ({
@@ -71,16 +73,24 @@ export function registerImportCommand(program: Command): void {
               .map((p) => p.date);
             console.error(`Not applied: ${remaining.join(", ")}`);
             console.error("Re-running the same file is safe (writes upsert).");
-            process.exit(1);
+            process.exit(exitCodeForError(err));
           }
           applied.push(plan.date);
-          console.log(
-            `${plan.date}: ${plan.snapshots
-              .map((s) => `${s.accountName} ${formatMinor(s.amountMinorRaw)}`)
-              .join(", ")}${carriedForward > 0 ? ` (+${carriedForward} carried forward)` : ""}`,
-          );
+          if (asJson) {
+            console.log(
+              JSON.stringify({ date: plan.date, carriedForward, response }),
+            );
+          } else {
+            console.log(
+              `${plan.date}: ${plan.snapshots
+                .map((s) => `${s.accountName} ${formatMinor(s.amountMinorRaw)}`)
+                .join(", ")}${carriedForward > 0 ? ` (+${carriedForward} carried forward)` : ""}`,
+            );
+          }
         }
-        console.log(`\nImported ${applied.length} date(s).`);
+        if (!asJson) {
+          console.log(`\nImported ${applied.length} date(s).`);
+        }
       } catch (err) {
         fail(err);
       }

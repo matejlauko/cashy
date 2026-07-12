@@ -17,7 +17,10 @@ const CORS_HEADERS = {
   "access-control-allow-private-network": "true",
 };
 
-function receiveToken(timeoutMs = 5 * 60 * 1000): {
+function receiveToken(
+  nonce: string,
+  timeoutMs = 5 * 60 * 1000,
+): {
   port: number;
   token: Promise<string>;
   stop: () => void;
@@ -38,8 +41,17 @@ function receiveToken(timeoutMs = 5 * 60 * 1000): {
       }
       if (req.method === "POST") {
         const body = (await req.text()).trim();
-        if (body.length > 0) {
-          resolve(body);
+        const [state, ...rest] = body.split("\n");
+        const receivedToken = rest.join("\n").trim();
+        if (state !== nonce) {
+          // Wrong nonce — reject this request but keep waiting for the real one.
+          return new Response("bad state", {
+            status: 400,
+            headers: CORS_HEADERS,
+          });
+        }
+        if (receivedToken.length > 0) {
+          resolve(receivedToken);
           return new Response("ok", { headers: CORS_HEADERS });
         }
         return new Response("empty token", {
@@ -121,9 +133,11 @@ export function registerAuthCommands(program: Command): void {
           return;
         }
 
-        const receiver = receiveToken();
+        const nonce = crypto.randomUUID();
+        const receiver = receiveToken(nonce);
         const url = new URL("/cli/auth", apiUrl);
         url.searchParams.set("port", String(receiver.port));
+        url.searchParams.set("state", nonce);
         url.searchParams.set("name", hostname());
 
         if (opts.open) {

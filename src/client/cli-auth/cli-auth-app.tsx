@@ -23,12 +23,22 @@ export function CliAuthApp() {
 
   const params = new URLSearchParams(window.location.search);
   const port = params.get("port");
+  const stateNonce = params.get("state");
   const host = params.get("name") ?? "unknown-host";
 
   useEffect(() => {
-    authClient.getSession().then(({ data }) => {
-      setState(data ? { step: "ready" } : { step: "signed-out" });
-    });
+    authClient
+      .getSession()
+      .then(({ data }) => {
+        setState(data ? { step: "ready" } : { step: "signed-out" });
+      })
+      .catch(() =>
+        setState({
+          step: "error",
+          message:
+            "Could not check your session — is the server reachable? Reload to retry.",
+        }),
+      );
   }, []);
 
   const authorize = async () => {
@@ -42,7 +52,9 @@ export function CliAuthApp() {
       });
       return;
     }
-    if (!port) {
+    // `port` without `state` means an older CLI opened this newer page — fall
+    // back to manual so we never POST an unbound token.
+    if (!port || !stateNonce) {
       setState({ step: "manual", key: data.key });
       return;
     }
@@ -50,7 +62,7 @@ export function CliAuthApp() {
       const res = await fetch(`http://127.0.0.1:${port}/`, {
         method: "POST",
         headers: { "content-type": "text/plain" },
-        body: data.key,
+        body: `${stateNonce}\n${data.key}`,
       });
       if (!res.ok) throw new Error(`loopback responded ${res.status}`);
       setState({ step: "done" });

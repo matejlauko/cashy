@@ -90,6 +90,8 @@ function parseJsonMatrix(content: string): {
     };
   }
   const rows: MatrixRow[] = [];
+  // Duplicate date/account keys are silently last-wins deduped by JSON.parse
+  // (unlike the CSV path, which reports duplicates as issues).
   for (const [date, value] of Object.entries(parsed)) {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       return {
