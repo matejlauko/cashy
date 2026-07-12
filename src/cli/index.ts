@@ -33,10 +33,13 @@ program
   .option("--token <token>", "API token")
   .option("--json", "print raw API responses as JSON");
 
-// Subcommands are registered by their modules (added in later tasks):
-// registerAuthCommands(program);
-// registerBalanceCommands(program);
-// registerImportCommand(program);
-// registerStatusCommand(program);
+import { registerStatusCommand } from "./commands/status";
+import { registerBalanceCommands } from "./commands/balance";
+import { registerImportCommand } from "./commands/import";
+
+// registerAuthCommands(program); // added in a later task
+registerStatusCommand(program);
+registerBalanceCommands(program);
+registerImportCommand(program);
 
 program.parseAsync().catch(fail);
