@@ -38,6 +38,9 @@ export const auth = betterAuth({
   plugins: [
     apiKey({
       enableSessionForAPIKeys: true,
+      // Plugin default is 32 — too short for the CLI's `cli-<hostname>-<date>`
+      // key names (a long hostname like `foo-MacBook-Pro-2.local` overflows it).
+      maximumNameLength: 128,
       // Plugin default is 10 requests/24h per key — far too low for the CLI
       // (bulk import makes one request per date). Server-level rate limiting
       // is unaffected by this.
