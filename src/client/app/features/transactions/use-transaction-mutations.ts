@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { rpc } from "@/client/rpc";
 import { parseApiError, type AppError } from "@/client/app/lib/api-error";
-import { currentMonthStart } from "@/lib/date";
 import type {
   CreateTransactionInput,
   UpdateTransactionInput,
@@ -21,9 +20,8 @@ export function useCreateTransaction(workspaceId: string) {
       return res.json();
     },
     onSuccess: () => {
-      const monthStart = currentMonthStart();
       queryClient.invalidateQueries({
-        queryKey: ["transactions", workspaceId, monthStart],
+        queryKey: ["transactions", workspaceId],
       });
       queryClient.invalidateQueries({
         queryKey: ["dashboard", workspaceId],
@@ -63,9 +61,8 @@ export function useUpdateTransaction(workspaceId: string) {
       return res.json();
     },
     onSuccess: () => {
-      const monthStart = currentMonthStart();
       queryClient.invalidateQueries({
-        queryKey: ["transactions", workspaceId, monthStart],
+        queryKey: ["transactions", workspaceId],
       });
       queryClient.invalidateQueries({
         queryKey: ["dashboard", workspaceId],
@@ -96,9 +93,8 @@ export function useSoftDeleteTransaction(workspaceId: string) {
       return res.json();
     },
     onSuccess: () => {
-      const monthStart = currentMonthStart();
       queryClient.invalidateQueries({
-        queryKey: ["transactions", workspaceId, monthStart],
+        queryKey: ["transactions", workspaceId],
       });
       queryClient.invalidateQueries({
         queryKey: ["dashboard", workspaceId],

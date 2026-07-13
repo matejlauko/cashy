@@ -20,7 +20,8 @@ import type {
 } from "@/schemas/transactions";
 import { TRANSACTION_TYPE_LABELS } from "@/schemas/transactions";
 import { formatMoneyMinor } from "@/lib/money";
-import { formatDisplayDate } from "@/lib/date";
+import { formatDisplayDate, currentMonthKey } from "@/lib/date";
+import { MonthNavigator } from "@/client/app/features/shared/month-navigator";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Plus, ArrowLeftRight, Trash2 } from "lucide-react";
@@ -36,8 +37,9 @@ export function TransactionsView({
   focusTransactionId,
   onFocusTransactionHandled,
 }: TransactionsViewProps) {
+  const [month, setMonth] = useState(currentMonthKey());
   const { data: transactions, isLoading, isError, error } =
-    useTransactions(workspaceId);
+    useTransactions(workspaceId, month);
 
   const createMutation = useCreateTransaction(workspaceId);
   const updateMutation = useUpdateTransaction(workspaceId);
@@ -102,13 +104,22 @@ export function TransactionsView({
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="h-6 w-28 animate-pulse rounded bg-muted" />
-          <div className="h-8 w-32 animate-pulse rounded bg-muted" />
+  const hasTransactions = transactions && transactions.length > 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Transactions</h1>
+        <div className="flex items-center gap-2">
+          <MonthNavigator month={month} onChange={setMonth} />
+          <Button size="sm" onClick={handleCreate}>
+            <Plus className="size-4" />
+            Add Transaction
+          </Button>
         </div>
+      </div>
+
+      {isLoading ? (
         <div className="divide-y rounded-lg border">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center justify-between gap-4 p-4">
@@ -120,33 +131,15 @@ export function TransactionsView({
             </div>
           ))}
         </div>
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="text-sm text-destructive">
-          {error instanceof Error ? error.message : "Failed to load transactions"}
+      ) : isError ? (
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="text-sm text-destructive">
+            {error instanceof Error
+              ? error.message
+              : "Failed to load transactions"}
+          </div>
         </div>
-      </div>
-    );
-  }
-
-  const hasTransactions = transactions && transactions.length > 0;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Transactions</h1>
-        <Button size="sm" onClick={handleCreate}>
-          <Plus className="size-4" />
-          Add Transaction
-        </Button>
-      </div>
-
-      {!hasTransactions ? (
+      ) : !hasTransactions ? (
         <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 text-center">
           <div className="rounded-full bg-muted p-4">
             <ArrowLeftRight className="size-6 text-muted-foreground" />

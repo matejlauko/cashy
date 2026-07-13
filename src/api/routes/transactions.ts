@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "@/api/context";
+import { currentMonthKey, isMonthKey } from "@/lib/date";
 import { logger } from "@/logger";
 import {
   createTransactionInput,
@@ -27,10 +28,23 @@ function domainErrorStatus(code: string): ContentfulStatusCode {
 }
 
 export const transactionsRoute = new Hono<AppEnv>()
-  // ── GET / — list current-month transactions ────────────────────────
+  // ── GET / — list transactions for a month (default: current) ──────
   .get("/", async (c) => {
+    const month = c.req.query("month") ?? currentMonthKey();
+    if (!isMonthKey(month)) {
+      return c.json(
+        {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Invalid month, expected YYYY-MM",
+          },
+        },
+        400,
+      );
+    }
+
     const workspaceId = c.get("workspaceId");
-    const transactions = await transactionsDb.listCurrentMonth(workspaceId);
+    const transactions = await transactionsDb.listMonth(workspaceId, month);
     return c.json({ transactions });
   })
 

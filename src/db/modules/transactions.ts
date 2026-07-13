@@ -66,11 +66,12 @@ function mapRow(r: Record<string, unknown>): TransactionRow {
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
-export async function listCurrentMonth(
+export async function listMonth(
   workspaceId: string,
+  monthKey: string,
 ): Promise<TransactionRow[]> {
-  const monthStart = currentMonthStart();
-  const monthEnd = nextMonthStart();
+  const monthStart = monthStartFromKey(monthKey);
+  const monthEnd = monthEndFromKey(monthKey);
 
   const rows = await sql`
     SELECT
