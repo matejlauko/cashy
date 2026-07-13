@@ -133,44 +133,6 @@ export function MetricCards({
         </Card>
       </div>
 
-      {/* Recurring KPIs */}
-      {(recurringIncomeTotal > 0 || recurringExpenseTotal > 0) && (
-        <div className="grid grid-cols-2 gap-2">
-          <Card className="gap-1">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Recurring Income
-              </CardTitle>
-              <CardAction>
-                <MetricInfo metricKey="recurringIncome" />
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-semibold tabular-nums text-emerald-600">
-                +{formatMoneyMinor(recurringIncomeTotal)}
-              </span>
-            </CardContent>
-          </Card>
-
-          <Card className="gap-1">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Recurring Expenses
-              </CardTitle>
-              <CardAction>
-                <MetricInfo metricKey="recurringExpenses" />
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-semibold tabular-nums text-destructive">
-                {recurringExpenseTotal > 0 ? "\u2212" : ""}
-                {formatMoneyMinor(recurringExpenseTotal)}
-              </span>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {budgetItemsTotal > 0 && (
         <div className="grid grid-cols-1 gap-2">
           <Card className="gap-1">

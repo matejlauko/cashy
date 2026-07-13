@@ -20,6 +20,7 @@ import { useAccounts } from "@/client/app/features/accounts/use-accounts";
 import { formatMoneyMinor } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { MetricInfo } from "@/components/ui/metric-info";
 import { Plus, Repeat, Pencil, Archive, Check, Loader2 } from "lucide-react";
 
 interface RecurringViewProps {
@@ -88,9 +89,7 @@ export function RecurringView({ workspaceId }: RecurringViewProps) {
         data: data as UpdateRecurringTransactionInput,
       });
     } else {
-      await createMutation.mutateAsync(
-        data as CreateRecurringTransactionInput,
-      );
+      await createMutation.mutateAsync(data as CreateRecurringTransactionInput);
     }
     setFormOpen(false);
   };
@@ -144,6 +143,14 @@ export function RecurringView({ workspaceId }: RecurringViewProps) {
 
   const hasItems = recurringTransactions && recurringTransactions.length > 0;
 
+  const recurringIncomeTotal = (recurringTransactions ?? [])
+    .filter((item) => item.type === "income")
+    .reduce((sum, item) => sum + item.amountMinor, 0);
+  const recurringExpenseTotal = (recurringTransactions ?? [])
+    .filter((item) => item.type === "expense")
+    .reduce((sum, item) => sum + item.amountMinor, 0);
+  const recurringNet = recurringIncomeTotal - recurringExpenseTotal;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -172,118 +179,162 @@ export function RecurringView({ workspaceId }: RecurringViewProps) {
           </Button>
         </div>
       ) : (
-        <div className="divide-y rounded-lg border">
-          {recurringTransactions.map((item) => (
-            <div
-              key={item.id}
-              className="flex cursor-pointer items-center justify-between gap-4 p-4 transition-colors hover:bg-muted/50"
-              onClick={() => handleEdit(item)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleEdit(item);
-                }
-              }}
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="truncate font-medium">{item.name}</span>
-                  <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    {TRANSACTION_TYPE_LABELS[item.type]}
-                  </span>
-                </div>
-                <div className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <span>{formatDayOfMonth(item.dayOfMonth)} of month</span>
-                  {item.financialAccountId && accountMap.get(item.financialAccountId) && (
-                    <>
-                      <span className="text-muted-foreground/40">
-                        &middot;
-                      </span>
-                      <span className="truncate">{accountMap.get(item.financialAccountId)}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <span
-                  className={cn(
-                    "mr-1 text-sm font-medium tabular-nums",
-                    item.type === "income"
-                      ? "text-emerald-600"
-                      : "text-destructive",
-                  )}
-                >
-                  {item.type === "income" ? "+" : ""}
-                  {formatMoneyMinor(item.signedAmount)}
+        <>
+          <div className="grid grid-cols-3 divide-x rounded-lg border bg-card">
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">
+                  Recurring Income
                 </span>
-                {(() => {
-                  const isAddingThis =
-                    addMutation.isPending && addingItemId === item.id;
-                  const disabled =
-                    isAddingThis ||
-                    item.addedThisMonth ||
-                    !item.financialAccountId;
-                  const tooltip = item.addedThisMonth
-                    ? "Already added this month"
-                    : !item.financialAccountId
-                      ? "Set an account on this recurring item first"
-                      : "Add this month's transaction";
-                  return (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={disabled}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAddingItemId(item.id);
-                        addMutation.mutate(item.id, {
-                          onSettled: () =>
-                            setAddingItemId((prev) =>
-                              prev === item.id ? null : prev,
-                            ),
-                        });
-                      }}
-                      aria-label={tooltip}
-                      title={tooltip}
-                    >
-                      {isAddingThis ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : item.addedThisMonth ? (
-                        <Check className="size-4" />
-                      ) : (
-                        <Plus className="size-4" />
-                      )}
-                    </Button>
-                  );
-                })()}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEdit(item);
-                  }}
-                  aria-label={`Edit ${item.name}`}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleArchiveIntent(item);
-                  }}
-                  aria-label={`Archive ${item.name}`}
-                >
-                  <Archive className="size-4" />
-                </Button>
+                <MetricInfo metricKey="recurringIncome" />
+              </div>
+              <div className="mt-1 text-xl font-semibold tabular-nums text-emerald-600">
+                +{formatMoneyMinor(recurringIncomeTotal)}
               </div>
             </div>
-          ))}
-        </div>
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">
+                  Recurring Expenses
+                </span>
+                <MetricInfo metricKey="recurringExpenses" />
+              </div>
+              <div className="mt-1 text-xl font-semibold tabular-nums text-destructive">
+                {recurringExpenseTotal > 0 ? "−" : ""}
+                {formatMoneyMinor(recurringExpenseTotal)}
+              </div>
+            </div>
+            <div className="px-4 py-3">
+              <span className="text-sm font-medium text-muted-foreground">
+                Net per Month
+              </span>
+              <div
+                className={cn(
+                  "mt-1 text-xl font-semibold tabular-nums",
+                  recurringNet < 0 && "text-destructive",
+                )}
+              >
+                {formatMoneyMinor(recurringNet)}
+              </div>
+            </div>
+          </div>
+
+          <div className="divide-y rounded-lg border">
+            {recurringTransactions.map((item) => (
+              <div
+                key={item.id}
+                className="flex cursor-pointer items-center justify-between gap-4 p-4 transition-colors hover:bg-muted/50"
+                onClick={() => handleEdit(item)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleEdit(item);
+                  }
+                }}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium">{item.name}</span>
+                    <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      {TRANSACTION_TYPE_LABELS[item.type]}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <span>{formatDayOfMonth(item.dayOfMonth)} of month</span>
+                    {item.financialAccountId &&
+                      accountMap.get(item.financialAccountId) && (
+                        <>
+                          <span className="text-muted-foreground/40">
+                            &middot;
+                          </span>
+                          <span className="truncate">
+                            {accountMap.get(item.financialAccountId)}
+                          </span>
+                        </>
+                      )}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <span
+                    className={cn(
+                      "mr-1 text-sm font-medium tabular-nums",
+                      item.type === "income"
+                        ? "text-emerald-600"
+                        : "text-destructive",
+                    )}
+                  >
+                    {item.type === "income" ? "+" : ""}
+                    {formatMoneyMinor(item.signedAmount)}
+                  </span>
+                  {(() => {
+                    const isAddingThis =
+                      addMutation.isPending && addingItemId === item.id;
+                    const disabled =
+                      isAddingThis ||
+                      item.addedThisMonth ||
+                      !item.financialAccountId;
+                    const tooltip = item.addedThisMonth
+                      ? "Already added this month"
+                      : !item.financialAccountId
+                        ? "Set an account on this recurring item first"
+                        : "Add this month's transaction";
+                    return (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={disabled}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddingItemId(item.id);
+                          addMutation.mutate(item.id, {
+                            onSettled: () =>
+                              setAddingItemId((prev) =>
+                                prev === item.id ? null : prev,
+                              ),
+                          });
+                        }}
+                        aria-label={tooltip}
+                        title={tooltip}
+                      >
+                        {isAddingThis ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : item.addedThisMonth ? (
+                          <Check className="size-4" />
+                        ) : (
+                          <Plus className="size-4" />
+                        )}
+                      </Button>
+                    );
+                  })()}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(item);
+                    }}
+                    aria-label={`Edit ${item.name}`}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleArchiveIntent(item);
+                    }}
+                    aria-label={`Archive ${item.name}`}
+                  >
+                    <Archive className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <RecurringTransactionFormDialog
