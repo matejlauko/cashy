@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cashy",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-10",
+  // Better Auth needs AsyncLocalStorage.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Staging runs on the workers.dev URL. At cutover: set workers_dev to false
+  // and uncomment the custom domain (see docs/cloudflare-deploy.md).
+  "workers_dev": true,
+  "preview_urls": false,
+  // "routes": [{ "pattern": "cashy.lauko.io", "custom_domain": true }],
+
+  // dist/client is filled in by the Vite plugin. Anything that is not a static
+  // asset falls through to the Worker; /api/* skips the asset lookup entirely.
+  "assets": { "run_worker_first": ["/api/*"] },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cashy",
+      // Replace with the id printed by `wrangler d1 create cashy --jurisdiction=eu`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Production values; .dev.vars overrides them locally. The secrets
+  // (BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET) are not listed
+  // here: they are set with `wrangler secret put` or `deploy --secrets-file`.
+  "vars": {
+    "APP_URL": "https://cashy.lauko.io",
+    "LOG_LEVEL": "info"
+  },
+
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 1 }
+  }
+}

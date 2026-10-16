@@ -7,7 +7,7 @@ import {
   WORKSPACE_COOKIE_MAX_AGE,
 } from "@/api/middleware/workspace";
 import { sql } from "@/db/client";
-import { env } from "@/env";
+import { isSecureOrigin } from "@/env";
 import { logger } from "@/logger";
 
 export const workspacesRoute = new Hono<AppEnv>().post(
@@ -54,7 +54,7 @@ export const workspacesRoute = new Hono<AppEnv>().post(
     setCookie(c, WORKSPACE_COOKIE_NAME, normalizedWorkspaceId, {
       httpOnly: true,
       sameSite: "Lax",
-      secure: env.NODE_ENV === "production",
+      secure: isSecureOrigin,
       path: "/",
       maxAge: WORKSPACE_COOKIE_MAX_AGE,
     });

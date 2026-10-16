@@ -68,7 +68,10 @@ class SessionBootstrapError extends Error {
   }
 }
 
-async function getErrorMessage(res: Response, fallback: string) {
+async function getErrorMessage(
+  res: { json(): Promise<unknown> },
+  fallback: string,
+) {
   try {
     const body = (await res.json()) as ApiErrorPayload;
     const message = body.error?.message;

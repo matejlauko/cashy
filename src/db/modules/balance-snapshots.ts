@@ -1,6 +1,6 @@
 import { sql } from "@/db/client";
-import { bigintToSafeNumber } from "@/lib/money";
-import { nextMonthKey, today } from "@/lib/date";
+import { safeIntegerFromDb } from "@/lib/money";
+import { isoFromMs, nextMonthKey, today } from "@/lib/date";
 import type { BulkBalanceUpdateInput } from "@/schemas/balance-snapshots";
 
 // ─── Domain error ────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ function mapPrefillRow(r: Record<string, unknown>): PrefillRow {
     financialAccountId: r.financial_account_id as string,
     accountName: r.account_name as string,
     accountType: r.account_type as PrefillRow["accountType"],
-    amountMinorRaw: bigintToSafeNumber(r.amount_minor_raw as bigint),
+    amountMinorRaw: safeIntegerFromDb(r.amount_minor_raw, "amount_minor_raw"),
   };
 }
 
@@ -66,17 +66,16 @@ export async function getPrefillByDate(
       fa.id AS financial_account_id,
       fa.name AS account_name,
       fa.type AS account_type,
-      COALESCE(latest.amount_minor_raw, 0) AS amount_minor_raw
+      COALESCE((
+        SELECT bs.amount_minor_raw
+        FROM balance_snapshot bs
+        WHERE bs.financial_account_id = fa.id
+          AND bs.workspace_id = fa.workspace_id
+          AND bs.effective_date <= ${effectiveDate}
+        ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
+        LIMIT 1
+      ), 0) AS amount_minor_raw
     FROM financial_account fa
-    LEFT JOIN (
-      SELECT DISTINCT ON (bs.financial_account_id)
-        bs.financial_account_id,
-        bs.amount_minor_raw
-      FROM balance_snapshot bs
-      WHERE bs.workspace_id = ${workspaceId}
-        AND bs.effective_date <= ${effectiveDate}
-      ORDER BY bs.financial_account_id, bs.effective_date DESC, bs.created_at DESC, bs.id DESC
-    ) latest ON latest.financial_account_id = fa.id
     WHERE fa.workspace_id = ${workspaceId}
       AND fa.archived_at IS NULL
     ORDER BY fa.name ASC
@@ -109,14 +108,12 @@ export async function getMonthMatrix(
     ORDER BY fa.archived_at ASC NULLS FIRST, fa.name
   `;
 
-  const accounts: BalanceHistoryAccount[] = accountRows.map(
-    (r: Record<string, unknown>) => ({
-      id: r.id as string,
-      name: r.name as string,
-      type: r.type as BalanceHistoryAccount["type"],
-      archivedAt: (r.archived_at as string | null) ?? null,
-    }),
-  );
+  const accounts: BalanceHistoryAccount[] = accountRows.map((r) => ({
+    id: r.id as string,
+    name: r.name as string,
+    type: r.type as BalanceHistoryAccount["type"],
+    archivedAt: r.archived_at === null ? null : isoFromMs(r.archived_at),
+  }));
 
   // Early return when there is no activity in the month.
   if (accounts.length === 0) {
@@ -131,34 +128,40 @@ export async function getMonthMatrix(
   //    Signed amount applied at SQL level (credit_card → negate) to match
   //    accounts.ts convention.
   const matrixRows = await sql`
-    SELECT DISTINCT ON (bs.financial_account_id, bs.effective_date)
-      bs.financial_account_id,
-      bs.effective_date::text AS effective_date,
-      CASE WHEN fa.type = 'credit_card' THEN -bs.amount_minor_raw
-           ELSE bs.amount_minor_raw
-      END AS signed_amount_minor_raw
-    FROM balance_snapshot bs
-    INNER JOIN financial_account fa
-      ON fa.id = bs.financial_account_id
-     AND fa.workspace_id = bs.workspace_id
-    WHERE bs.workspace_id = ${workspaceId}
-      AND bs.effective_date >= ${monthStart}
-      AND bs.effective_date < ${nextMonthStart}
-    ORDER BY
-      bs.financial_account_id,
-      bs.effective_date,
-      bs.created_at DESC,
-      bs.id DESC
+    SELECT financial_account_id, effective_date, signed_amount_minor_raw
+    FROM (
+      SELECT
+        bs.financial_account_id,
+        bs.effective_date,
+        CASE WHEN fa.type = 'credit_card' THEN -bs.amount_minor_raw
+             ELSE bs.amount_minor_raw
+        END AS signed_amount_minor_raw,
+        ROW_NUMBER() OVER (
+          PARTITION BY bs.financial_account_id, bs.effective_date
+          ORDER BY bs.created_at DESC, bs.id DESC
+        ) AS rn
+      FROM balance_snapshot bs
+      INNER JOIN financial_account fa
+        ON fa.id = bs.financial_account_id
+       AND fa.workspace_id = bs.workspace_id
+      WHERE bs.workspace_id = ${workspaceId}
+        AND bs.effective_date >= ${monthStart}
+        AND bs.effective_date < ${nextMonthStart}
+    )
+    WHERE rn = 1
   `;
 
   // Pivot into rows grouped by date, newest-first.
   const accountIdSet = new Set(accounts.map((a) => a.id));
   const byDate = new Map<string, Record<string, number>>();
-  for (const r of matrixRows as Record<string, unknown>[]) {
+  for (const r of matrixRows) {
     const accountId = r.financial_account_id as string;
     if (!accountIdSet.has(accountId)) continue;
     const date = r.effective_date as string;
-    const signed = bigintToSafeNumber(r.signed_amount_minor_raw as bigint);
+    const signed = safeIntegerFromDb(
+      r.signed_amount_minor_raw,
+      "signed_amount_minor_raw",
+    );
     if (!byDate.has(date)) byDate.set(date, {});
     byDate.get(date)![accountId] = signed;
   }
@@ -171,30 +174,34 @@ export async function getMonthMatrix(
   //    signed. Uses all accounts in the workspace; app-code filter keeps only
   //    those present in `accounts` to keep the payload minimal.
   const baselineRows = await sql`
-    SELECT DISTINCT ON (bs.financial_account_id)
-      bs.financial_account_id,
-      CASE WHEN fa.type = 'credit_card' THEN -bs.amount_minor_raw
-           ELSE bs.amount_minor_raw
-      END AS signed_amount_minor_raw
-    FROM balance_snapshot bs
-    INNER JOIN financial_account fa
-      ON fa.id = bs.financial_account_id
-     AND fa.workspace_id = bs.workspace_id
-    WHERE bs.workspace_id = ${workspaceId}
-      AND bs.effective_date < ${monthStart}
-    ORDER BY
-      bs.financial_account_id,
-      bs.effective_date DESC,
-      bs.created_at DESC,
-      bs.id DESC
+    SELECT financial_account_id, signed_amount_minor_raw
+    FROM (
+      SELECT
+        bs.financial_account_id,
+        CASE WHEN fa.type = 'credit_card' THEN -bs.amount_minor_raw
+             ELSE bs.amount_minor_raw
+        END AS signed_amount_minor_raw,
+        ROW_NUMBER() OVER (
+          PARTITION BY bs.financial_account_id
+          ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
+        ) AS rn
+      FROM balance_snapshot bs
+      INNER JOIN financial_account fa
+        ON fa.id = bs.financial_account_id
+       AND fa.workspace_id = bs.workspace_id
+      WHERE bs.workspace_id = ${workspaceId}
+        AND bs.effective_date < ${monthStart}
+    )
+    WHERE rn = 1
   `;
 
   const baselineBalances: Record<string, number> = {};
-  for (const r of baselineRows as Record<string, unknown>[]) {
+  for (const r of baselineRows) {
     const id = r.financial_account_id as string;
     if (!accountIdSet.has(id)) continue;
-    baselineBalances[id] = bigintToSafeNumber(
-      r.signed_amount_minor_raw as bigint,
+    baselineBalances[id] = safeIntegerFromDb(
+      r.signed_amount_minor_raw,
+      "signed_amount_minor_raw",
     );
   }
 
@@ -221,42 +228,50 @@ export async function bulkCreate(
     );
   }
 
-  await sql.begin(async (tx) => {
-    const activeRows = await tx`
-      SELECT id FROM financial_account
-      WHERE workspace_id = ${workspaceId}
-        AND archived_at IS NULL
-      ORDER BY id
-    `;
+  // D1 has no interactive transactions, so the active-account check and the
+  // insert are separate statements. The composite FK still rejects accounts
+  // from another workspace.
+  const activeRows = await sql`
+    SELECT id FROM financial_account
+    WHERE workspace_id = ${workspaceId}
+      AND archived_at IS NULL
+    ORDER BY id
+  `;
 
-    const activeIds = new Set(
-      activeRows.map((r: Record<string, unknown>) => r.id as string),
+  const activeIds = new Set(activeRows.map((r) => r.id as string));
+  const submittedIds = new Set(snapshots.map((s) => s.financialAccountId));
+
+  if (
+    snapshots.length !== activeIds.size ||
+    activeIds.size !== submittedIds.size ||
+    ![...submittedIds].every((id) => activeIds.has(id))
+  ) {
+    throw new BalanceSnapshotError(
+      "SNAPSHOT_ACCOUNT_MISMATCH",
+      "Submitted accounts do not match active accounts",
     );
-    const submittedIds = new Set(snapshots.map((s) => s.financialAccountId));
+  }
 
-    if (
-      snapshots.length !== activeIds.size ||
-      activeIds.size !== submittedIds.size ||
-      ![...submittedIds].every((id) => activeIds.has(id))
-    ) {
-      throw new BalanceSnapshotError(
-        "SNAPSHOT_ACCOUNT_MISMATCH",
-        "Submitted accounts do not match active accounts",
-      );
-    }
+  // All rows go in as one statement (atomic, and one D1 query no matter how
+  // many accounts there are).
+  const rowsJson = JSON.stringify(
+    snapshots.map((snapshot) => ({
+      id: crypto.randomUUID(),
+      financialAccountId: snapshot.financialAccountId,
+      amountMinorRaw: snapshot.amountMinorRaw,
+    })),
+  );
 
-    for (const snapshot of snapshots) {
-      const snapshotId = crypto.randomUUID();
-      await tx`
-        INSERT INTO balance_snapshot (
-          id, workspace_id, financial_account_id, effective_date, amount_minor_raw,
-          created_by_user_id, updated_by_user_id
-        ) VALUES (
-          ${snapshotId}, ${workspaceId}, ${snapshot.financialAccountId},
-          ${effectiveDate}, ${snapshot.amountMinorRaw},
-          ${userId}, ${userId}
-        )
-      `;
-    }
-  });
+  await sql`
+    INSERT INTO balance_snapshot (
+      id, workspace_id, financial_account_id, effective_date, amount_minor_raw,
+      created_by_user_id, updated_by_user_id
+    )
+    SELECT
+      json_extract(j.value, '$.id'), ${workspaceId},
+      json_extract(j.value, '$.financialAccountId'),
+      ${effectiveDate}, json_extract(j.value, '$.amountMinorRaw'),
+      ${userId}, ${userId}
+    FROM json_each(${rowsJson}) AS j
+  `;
 }

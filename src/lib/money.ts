@@ -1,6 +1,3 @@
-const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
-const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
-
 /**
  * Assert a value can be safely represented in JSON as an integer.
  */
@@ -56,15 +53,13 @@ export function formatMoneyMinor(amountMinor: number): string {
 }
 
 /**
- * Convert a bigint from the database to a safe JS number.
- * Throws if the value exceeds Number.MAX_SAFE_INTEGER / Number.MIN_SAFE_INTEGER.
+ * Read an integer column from a database row as a safe JS number.
+ * D1 returns 64-bit integers as doubles, so a value outside the safe integer
+ * range has already lost precision by the time it gets here.
  */
-export function bigintToSafeNumber(value: bigint): number {
-  if (value > MAX_SAFE_BIGINT) {
-    throw new Error(`Value ${value} exceeds MAX_SAFE_INTEGER`);
+export function safeIntegerFromDb(value: unknown, label = "value"): number {
+  if (typeof value !== "number") {
+    throw new Error(`${label} must be a number, got ${typeof value}`);
   }
-  if (value < MIN_SAFE_BIGINT) {
-    throw new Error(`Value ${value} is below MIN_SAFE_INTEGER`);
-  }
-  return Number(value);
+  return assertSafeInteger(value, label);
 }

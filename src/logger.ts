@@ -44,10 +44,13 @@ function write(level: LogLevel, message: string, context?: LogContext): void {
       : value,
   );
 
+  // Workers Logs picks the severity from the console method.
   if (level === "error") {
-    process.stderr.write(line + "\n");
+    console.error(line);
+  } else if (level === "warn") {
+    console.warn(line);
   } else {
-    process.stdout.write(line + "\n");
+    console.log(line);
   }
 }
 

@@ -1,30 +1,32 @@
 import {
-  pgTable,
+  sqliteTable,
   text,
-  boolean,
-  timestamp,
   integer,
   index,
   unique,
   uniqueIndex,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
+// Instants are stored as epoch milliseconds (UTC); calendar dates as
+// 'YYYY-MM-DD' text.
+export const timestampMs = (name: string) =>
+  integer(name, { mode: "timestamp_ms" });
+export const nowMs = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
+
 // ─── user (Better Auth canonical + google_sub extension) ────────────────────
-export const user = pgTable(
+export const user = sqliteTable(
   "user",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     email: text("email").notNull(),
-    emailVerified: boolean("email_verified").notNull().default(false),
+    emailVerified: integer("email_verified", { mode: "boolean" })
+      .notNull()
+      .default(false),
     image: text("image"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestampMs("created_at").notNull().default(nowMs),
+    updatedAt: timestampMs("updated_at").notNull().default(nowMs),
     googleSub: text("google_sub"),
   },
   (t) => [
@@ -36,18 +38,14 @@ export const user = pgTable(
 );
 
 // ─── session (Better Auth canonical) ────────────────────────────────────────
-export const session = pgTable(
+export const session = sqliteTable(
   "session",
   {
     id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    expiresAt: timestampMs("expires_at").notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestampMs("created_at").notNull().default(nowMs),
+    updatedAt: timestampMs("updated_at").notNull().default(nowMs),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
     userId: text("user_id")
@@ -58,7 +56,7 @@ export const session = pgTable(
 );
 
 // ─── user_account (Better Auth "account" table, renamed to avoid collision) ─
-export const userAccount = pgTable(
+export const userAccount = sqliteTable(
   "user_account",
   {
     id: text("id").primaryKey(),
@@ -70,20 +68,12 @@ export const userAccount = pgTable(
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at", {
-      withTimezone: true,
-    }),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
-      withTimezone: true,
-    }),
+    accessTokenExpiresAt: timestampMs("access_token_expires_at"),
+    refreshTokenExpiresAt: timestampMs("refresh_token_expires_at"),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestampMs("created_at").notNull().default(nowMs),
+    updatedAt: timestampMs("updated_at").notNull().default(nowMs),
   },
   (t) => [
     index("user_account_user_id_idx").on(t.userId),
@@ -95,25 +85,21 @@ export const userAccount = pgTable(
 );
 
 // ─── verification (Better Auth canonical) ───────────────────────────────────
-export const verification = pgTable(
+export const verification = sqliteTable(
   "verification",
   {
     id: text("id").primaryKey(),
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    expiresAt: timestampMs("expires_at").notNull(),
+    createdAt: timestampMs("created_at").notNull().default(nowMs),
+    updatedAt: timestampMs("updated_at").notNull().default(nowMs),
   },
   (t) => [index("verification_identifier_idx").on(t.identifier)],
 );
 
 // ─── apikey (Better Auth api-key plugin) ─────────────────────────────────────
-export const apikey = pgTable(
+export const apikey = sqliteTable(
   "apikey",
   {
     id: text("id").primaryKey(),
@@ -127,21 +113,17 @@ export const apikey = pgTable(
     referenceId: text("reference_id").notNull(),
     refillInterval: integer("refill_interval"),
     refillAmount: integer("refill_amount"),
-    lastRefillAt: timestamp("last_refill_at", { withTimezone: true }),
-    enabled: boolean("enabled").default(true),
-    rateLimitEnabled: boolean("rate_limit_enabled"),
+    lastRefillAt: timestampMs("last_refill_at"),
+    enabled: integer("enabled", { mode: "boolean" }).default(true),
+    rateLimitEnabled: integer("rate_limit_enabled", { mode: "boolean" }),
     rateLimitTimeWindow: integer("rate_limit_time_window"),
     rateLimitMax: integer("rate_limit_max"),
     requestCount: integer("request_count"),
     remaining: integer("remaining"),
-    lastRequest: timestamp("last_request", { withTimezone: true }),
-    expiresAt: timestamp("expires_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    lastRequest: timestampMs("last_request"),
+    expiresAt: timestampMs("expires_at"),
+    createdAt: timestampMs("created_at").notNull().default(nowMs),
+    updatedAt: timestampMs("updated_at").notNull().default(nowMs),
     permissions: text("permissions"),
     metadata: text("metadata"),
   },

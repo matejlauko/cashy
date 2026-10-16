@@ -1,9 +1,9 @@
-import { sql } from "@/db/client";
-import { bigintToSafeNumber } from "@/lib/money";
-import { today } from "@/lib/date";
+import { batch, isUniqueViolation, sql } from "@/db/client";
+import { safeIntegerFromDb } from "@/lib/money";
+import { isoFromMs, today } from "@/lib/date";
 import type { CreateAccountInput, UpdateAccountInput } from "@/schemas/accounts";
 
-const ACCOUNT_NAME_UNIQUE_CONSTRAINT = "financial_account_workspace_name_unique";
+const ACCOUNT_NAME_UNIQUE_INDEX = "financial_account_workspace_name_unique";
 
 // ─── Domain error ────────────────────────────────────────────────────────────
 
@@ -41,27 +41,17 @@ function mapAccountRow(r: Record<string, unknown>): AccountRow {
     name: r.name as string,
     institutionName: (r.institution_name as string) ?? null,
     type: r.type as AccountRow["type"],
-    currentBalance: bigintToSafeNumber(r.current_balance as bigint),
-    createdAt: String(r.created_at),
-    updatedAt: String(r.updated_at),
+    currentBalance: safeIntegerFromDb(r.current_balance, "current_balance"),
+    createdAt: isoFromMs(r.created_at),
+    updatedAt: isoFromMs(r.updated_at),
   };
 }
 
-function isUniqueNameViolation(err: unknown): boolean {
-  return (
-    err instanceof Error &&
-    "code" in err &&
-    (err as { code: string }).code === "23505" &&
-    ("constraint" in err
-      ? (err as { constraint: string }).constraint === ACCOUNT_NAME_UNIQUE_CONSTRAINT
-      : "constraint_name" in err
-        ? (err as { constraint_name: string }).constraint_name ===
-          ACCOUNT_NAME_UNIQUE_CONSTRAINT
-        : err.message?.includes(ACCOUNT_NAME_UNIQUE_CONSTRAINT))
-  );
-}
-
 // ─── Queries ─────────────────────────────────────────────────────────────────
+//
+// "Current balance" is the latest snapshot per account (credit cards negated),
+// looked up with a correlated subquery that walks
+// balance_snapshot_account_date_idx.
 
 export async function listActive(workspaceId: string): Promise<AccountRow[]> {
   const rows = await sql`
@@ -72,21 +62,16 @@ export async function listActive(workspaceId: string): Promise<AccountRow[]> {
       fa.type,
       fa.created_at,
       fa.updated_at,
-      COALESCE(
-        CASE WHEN fa.type = 'credit_card' THEN -latest.amount_minor_raw
-             ELSE latest.amount_minor_raw
-        END,
-        0
-      ) AS current_balance
+      COALESCE((
+        SELECT bs.amount_minor_raw
+        FROM balance_snapshot bs
+        WHERE bs.financial_account_id = fa.id
+          AND bs.workspace_id = fa.workspace_id
+        ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
+        LIMIT 1
+      ), 0) * CASE WHEN fa.type = 'credit_card' THEN -1 ELSE 1 END
+        AS current_balance
     FROM financial_account fa
-    LEFT JOIN LATERAL (
-      SELECT bs.amount_minor_raw
-      FROM balance_snapshot bs
-      WHERE bs.financial_account_id = fa.id
-        AND bs.workspace_id = fa.workspace_id
-      ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
-      LIMIT 1
-    ) latest ON true
     WHERE fa.workspace_id = ${workspaceId}
       AND fa.archived_at IS NULL
     ORDER BY fa.name ASC
@@ -106,22 +91,17 @@ export async function listActiveAsOf(
       fa.type,
       fa.created_at,
       fa.updated_at,
-      COALESCE(
-        CASE WHEN fa.type = 'credit_card' THEN -latest.amount_minor_raw
-             ELSE latest.amount_minor_raw
-        END,
-        0
-      ) AS current_balance
+      COALESCE((
+        SELECT bs.amount_minor_raw
+        FROM balance_snapshot bs
+        WHERE bs.financial_account_id = fa.id
+          AND bs.workspace_id = fa.workspace_id
+          AND bs.effective_date <= ${asOfDate}
+        ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
+        LIMIT 1
+      ), 0) * CASE WHEN fa.type = 'credit_card' THEN -1 ELSE 1 END
+        AS current_balance
     FROM financial_account fa
-    LEFT JOIN LATERAL (
-      SELECT bs.amount_minor_raw
-      FROM balance_snapshot bs
-      WHERE bs.financial_account_id = fa.id
-        AND bs.workspace_id = fa.workspace_id
-        AND bs.effective_date <= ${asOfDate}
-      ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
-      LIMIT 1
-    ) latest ON true
     WHERE fa.workspace_id = ${workspaceId}
       AND fa.archived_at IS NULL
     ORDER BY fa.name ASC
@@ -141,28 +121,23 @@ export async function listArchived(
       fa.created_at,
       fa.updated_at,
       fa.archived_at,
-      COALESCE(
-        CASE WHEN fa.type = 'credit_card' THEN -latest.amount_minor_raw
-             ELSE latest.amount_minor_raw
-        END,
-        0
-      ) AS current_balance
+      COALESCE((
+        SELECT bs.amount_minor_raw
+        FROM balance_snapshot bs
+        WHERE bs.financial_account_id = fa.id
+          AND bs.workspace_id = fa.workspace_id
+        ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
+        LIMIT 1
+      ), 0) * CASE WHEN fa.type = 'credit_card' THEN -1 ELSE 1 END
+        AS current_balance
     FROM financial_account fa
-    LEFT JOIN LATERAL (
-      SELECT bs.amount_minor_raw
-      FROM balance_snapshot bs
-      WHERE bs.financial_account_id = fa.id
-        AND bs.workspace_id = fa.workspace_id
-      ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
-      LIMIT 1
-    ) latest ON true
     WHERE fa.workspace_id = ${workspaceId}
       AND fa.archived_at IS NOT NULL
     ORDER BY fa.name ASC
   `;
-  return rows.map((r: Record<string, unknown>) => ({
+  return rows.map((r) => ({
     ...mapAccountRow(r),
-    archivedAt: String(r.archived_at),
+    archivedAt: isoFromMs(r.archived_at),
   }));
 }
 
@@ -178,21 +153,16 @@ export async function getById(
       fa.type,
       fa.created_at,
       fa.updated_at,
-      COALESCE(
-        CASE WHEN fa.type = 'credit_card' THEN -latest.amount_minor_raw
-             ELSE latest.amount_minor_raw
-        END,
-        0
-      ) AS current_balance
+      COALESCE((
+        SELECT bs.amount_minor_raw
+        FROM balance_snapshot bs
+        WHERE bs.financial_account_id = fa.id
+          AND bs.workspace_id = fa.workspace_id
+        ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
+        LIMIT 1
+      ), 0) * CASE WHEN fa.type = 'credit_card' THEN -1 ELSE 1 END
+        AS current_balance
     FROM financial_account fa
-    LEFT JOIN LATERAL (
-      SELECT bs.amount_minor_raw
-      FROM balance_snapshot bs
-      WHERE bs.financial_account_id = fa.id
-        AND bs.workspace_id = fa.workspace_id
-      ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
-      LIMIT 1
-    ) latest ON true
     WHERE fa.id = ${id}
       AND fa.workspace_id = ${workspaceId}
   `;
@@ -213,8 +183,9 @@ export async function create(
   const institutionName = data.institutionName?.trim() || null;
 
   try {
-    await sql.begin(async (tx) => {
-      await tx`
+    // Account and opening snapshot are written atomically.
+    await batch([
+      sql`
         INSERT INTO financial_account (
           id, workspace_id, name, institution_name, type,
           created_by_user_id, updated_by_user_id
@@ -222,9 +193,8 @@ export async function create(
           ${accountId}, ${workspaceId}, ${data.name}, ${institutionName}, ${data.type},
           ${userId}, ${userId}
         )
-      `;
-
-      await tx`
+      `,
+      sql`
         INSERT INTO balance_snapshot (
           id, workspace_id, financial_account_id, effective_date, amount_minor_raw,
           created_by_user_id, updated_by_user_id
@@ -232,10 +202,10 @@ export async function create(
           ${snapshotId}, ${workspaceId}, ${accountId}, ${effectiveDate}, ${data.initialBalance},
           ${userId}, ${userId}
         )
-      `;
-    });
+      `,
+    ]);
   } catch (err) {
-    if (isUniqueNameViolation(err)) {
+    if (isUniqueViolation(err, ACCOUNT_NAME_UNIQUE_INDEX)) {
       throw new AccountError(
         "ACCOUNT_NAME_TAKEN",
         "An account with this name already exists in this workspace",
@@ -266,7 +236,7 @@ export async function update(
         name = ${data.name},
         institution_name = ${institutionName},
         type = ${data.type},
-        updated_at = now(),
+        updated_at = ${Date.now()},
         updated_by_user_id = ${userId}
       WHERE id = ${id}
         AND workspace_id = ${workspaceId}
@@ -290,7 +260,7 @@ export async function update(
     }
   } catch (err) {
     if (err instanceof AccountError) throw err;
-    if (isUniqueNameViolation(err)) {
+    if (isUniqueViolation(err, ACCOUNT_NAME_UNIQUE_INDEX)) {
       throw new AccountError(
         "ACCOUNT_NAME_TAKEN",
         "An account with this name already exists in this workspace",
@@ -334,8 +304,8 @@ export async function archive(
   `;
 
   if (balanceRows.length > 0) {
-    const rawBalance = balanceRows[0]!.amount_minor_raw as bigint;
-    if (rawBalance !== 0n) {
+    const rawBalance = balanceRows[0]!.amount_minor_raw;
+    if (rawBalance !== 0) {
       throw new AccountError(
         "ACCOUNT_BALANCE_NOT_ZERO",
         "Account balance must be zero before archiving",
@@ -343,12 +313,13 @@ export async function archive(
     }
   }
 
+  const now = Date.now();
   const rows = await sql`
     UPDATE financial_account
     SET
-      archived_at = now(),
+      archived_at = ${now},
       archived_by_user_id = ${userId},
-      updated_at = now(),
+      updated_at = ${now},
       updated_by_user_id = ${userId}
     WHERE id = ${id}
       AND workspace_id = ${workspaceId}

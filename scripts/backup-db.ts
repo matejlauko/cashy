@@ -1,15 +1,18 @@
+// Backs up the D1 database into backups/<timestamp>/ as two files:
+// schema.sql and data.sql.
+//
+//   bun run db:backup              # the deployed database
+//   bun run db:backup -- --local   # the local dev database
+//
+// Two files on purpose. A combined `wrangler d1 export` writes each table's
+// rows right after its CREATE TABLE, so child rows come before their parent
+// table exists and the file cannot be restored into an empty database.
 import { $ } from "bun";
 
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.error("DATABASE_URL is not set");
-  process.exit(1);
-}
-
+const target = process.argv.includes("--local") ? "--local" : "--remote";
 const backupRoot = process.env.BACKUP_DIR ?? "backups";
 
-const now = new Date();
-const timestamp = now
+const timestamp = new Date()
   .toISOString()
   .replace(/T/, "_")
   .replace(/:/g, "-")
@@ -18,14 +21,12 @@ const timestamp = now
 const dir = `${backupRoot}/${timestamp}`;
 await $`mkdir -p ${dir}`;
 
-console.log(`Backing up to ${dir}/`);
+console.log(`Backing up (${target.slice(2)}) to ${dir}/`);
 
-// Schema only
-await $`pg_dump ${DATABASE_URL} --schema-only --no-owner --no-privileges > ${dir}/schema.sql`;
+await $`bunx wrangler d1 export cashy ${target} --no-data --output=${dir}/schema.sql`.quiet();
 console.log("Schema saved to schema.sql");
 
-// Data only
-await $`pg_dump ${DATABASE_URL} --data-only --no-owner --no-privileges > ${dir}/data.sql`;
+await $`bunx wrangler d1 export cashy ${target} --no-schema --output=${dir}/data.sql`.quiet();
 console.log("Data saved to data.sql");
 
 console.log("Done!");

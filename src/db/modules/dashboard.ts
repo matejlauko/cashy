@@ -1,5 +1,5 @@
 import { sql } from "@/db/client";
-import { bigintToSafeNumber } from "@/lib/money";
+import { safeIntegerFromDb } from "@/lib/money";
 import { monthStartFromKey, monthEndFromKey } from "@/lib/date";
 
 // ─── Return types ────────────────────────────────────────────────────────────
@@ -47,44 +47,40 @@ export async function getDashboardSummary(
   const rows = await sql`
     WITH latest_balances AS (
       SELECT
-        COALESCE(
-          CASE WHEN fa.type = 'credit_card' THEN -latest.amount_minor_raw
-               ELSE latest.amount_minor_raw
-          END,
-          0
-        ) AS signed_balance,
-        latest.effective_date
+        COALESCE((
+          SELECT bs.amount_minor_raw
+          FROM balance_snapshot bs
+          WHERE bs.financial_account_id = fa.id
+            AND bs.workspace_id = fa.workspace_id
+            AND bs.effective_date <= ${asOfDate}
+          ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
+          LIMIT 1
+        ), 0) * CASE WHEN fa.type = 'credit_card' THEN -1 ELSE 1 END
+          AS signed_balance,
+        (
+          SELECT MAX(bs.effective_date)
+          FROM balance_snapshot bs
+          WHERE bs.financial_account_id = fa.id
+            AND bs.workspace_id = fa.workspace_id
+            AND bs.effective_date <= ${asOfDate}
+        ) AS effective_date
       FROM financial_account fa
-      LEFT JOIN LATERAL (
-        SELECT bs.amount_minor_raw, bs.effective_date
-        FROM balance_snapshot bs
-        WHERE bs.financial_account_id = fa.id
-          AND bs.workspace_id = fa.workspace_id
-          AND bs.effective_date <= ${asOfDate}
-        ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
-        LIMIT 1
-      ) latest ON true
       WHERE fa.workspace_id = ${workspaceId}
         AND fa.archived_at IS NULL
     ),
     opening_balances AS (
       SELECT
-        COALESCE(
-          CASE WHEN fa.type = 'credit_card' THEN -opening.amount_minor_raw
-               ELSE opening.amount_minor_raw
-          END,
-          0
-        ) AS signed_balance
+        COALESCE((
+          SELECT bs.amount_minor_raw
+          FROM balance_snapshot bs
+          WHERE bs.financial_account_id = fa.id
+            AND bs.workspace_id = fa.workspace_id
+            AND bs.effective_date < ${monthStart}
+          ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
+          LIMIT 1
+        ), 0) * CASE WHEN fa.type = 'credit_card' THEN -1 ELSE 1 END
+          AS signed_balance
       FROM financial_account fa
-      LEFT JOIN LATERAL (
-        SELECT bs.amount_minor_raw
-        FROM balance_snapshot bs
-        WHERE bs.financial_account_id = fa.id
-          AND bs.workspace_id = fa.workspace_id
-          AND bs.effective_date < ${monthStart}
-        ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
-        LIMIT 1
-      ) opening ON true
       WHERE fa.workspace_id = ${workspaceId}
         AND fa.archived_at IS NULL
     ),
@@ -132,35 +128,39 @@ export async function getDashboardSummary(
 
   const row = rows[0]!;
   return {
-    currentBalance: bigintToSafeNumber(row.current_balance as bigint),
-    openingMonthBalance: bigintToSafeNumber(
-      row.opening_month_balance as bigint,
+    currentBalance: safeIntegerFromDb(row.current_balance, "current_balance"),
+    openingMonthBalance: safeIntegerFromDb(
+      row.opening_month_balance,
+      "opening_month_balance",
     ),
-    monthlyIncomeTotal: bigintToSafeNumber(
-      row.monthly_income_total as bigint,
+    monthlyIncomeTotal: safeIntegerFromDb(
+      row.monthly_income_total,
+      "monthly_income_total",
     ),
-    monthlyExpenseTotal: bigintToSafeNumber(
-      row.monthly_expense_total as bigint,
+    monthlyExpenseTotal: safeIntegerFromDb(
+      row.monthly_expense_total,
+      "monthly_expense_total",
     ),
-    monthlySpendingTotal: bigintToSafeNumber(
-      row.monthly_spending_total as bigint,
+    monthlySpendingTotal: safeIntegerFromDb(
+      row.monthly_spending_total,
+      "monthly_spending_total",
     ),
-    monthlySpendingExcludingTracked: bigintToSafeNumber(
-      row.monthly_spending_excluding_tracked as bigint,
+    monthlySpendingExcludingTracked: safeIntegerFromDb(
+      row.monthly_spending_excluding_tracked,
+      "monthly_spending_excluding_tracked",
     ),
-    lastSnapshotDate: row.last_snapshot_date
-      ? row.last_snapshot_date instanceof Date
-        ? row.last_snapshot_date.toISOString().slice(0, 10)
-        : String(row.last_snapshot_date)
-      : null,
-    recurringIncomeTotal: bigintToSafeNumber(
-      row.recurring_income_total as bigint,
+    lastSnapshotDate: (row.last_snapshot_date as string | null) ?? null,
+    recurringIncomeTotal: safeIntegerFromDb(
+      row.recurring_income_total,
+      "recurring_income_total",
     ),
-    recurringExpenseTotal: bigintToSafeNumber(
-      row.recurring_expense_total as bigint,
+    recurringExpenseTotal: safeIntegerFromDb(
+      row.recurring_expense_total,
+      "recurring_expense_total",
     ),
-    budgetItemsTotal: bigintToSafeNumber(
-      row.budget_items_total as bigint,
+    budgetItemsTotal: safeIntegerFromDb(
+      row.budget_items_total,
+      "budget_items_total",
     ),
   };
 }
@@ -173,16 +173,15 @@ export async function getBalanceChartData(
   const monthStart = monthStartFromKey(monthKey);
 
   const rows = await sql`
-    WITH date_series AS (
-      SELECT d::date AS chart_date
-      FROM generate_series(
-        ${monthStart}::date,
-        ${asOfDate}::date,
-        '1 day'::interval
-      ) AS d
+    WITH RECURSIVE date_series(chart_date) AS (
+      SELECT ${monthStart} WHERE ${monthStart} <= ${asOfDate}
+      UNION ALL
+      SELECT date(chart_date, '+1 day')
+      FROM date_series
+      WHERE chart_date < ${asOfDate}
     ),
     relevant_accounts AS (
-      SELECT DISTINCT fa.id AS account_id, fa.type
+      SELECT fa.id AS account_id, fa.type
       FROM financial_account fa
       WHERE fa.workspace_id = ${workspaceId}
         AND EXISTS (
@@ -190,38 +189,28 @@ export async function getBalanceChartData(
           WHERE bs.financial_account_id = fa.id
             AND bs.workspace_id = fa.workspace_id
         )
-    ),
-    daily_balances AS (
-      SELECT
-        ds.chart_date,
-        COALESCE(
-          CASE WHEN ra.type = 'credit_card' THEN -latest.amount_minor_raw
-               ELSE latest.amount_minor_raw
-          END,
-          0
-        ) AS signed_balance
-      FROM date_series ds
-      CROSS JOIN relevant_accounts ra
-      LEFT JOIN LATERAL (
-        SELECT bs.amount_minor_raw
-        FROM balance_snapshot bs
-        WHERE bs.financial_account_id = ra.account_id
-          AND bs.workspace_id = ${workspaceId}
-          AND bs.effective_date <= ds.chart_date
-        ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
-        LIMIT 1
-      ) latest ON true
     )
     SELECT
-      chart_date::text AS date,
-      SUM(signed_balance) AS total_balance
-    FROM daily_balances
-    GROUP BY chart_date
-    ORDER BY chart_date ASC
+      ds.chart_date AS date,
+      SUM(
+        COALESCE((
+          SELECT bs.amount_minor_raw
+          FROM balance_snapshot bs
+          WHERE bs.financial_account_id = ra.account_id
+            AND bs.workspace_id = ${workspaceId}
+            AND bs.effective_date <= ds.chart_date
+          ORDER BY bs.effective_date DESC, bs.created_at DESC, bs.id DESC
+          LIMIT 1
+        ), 0) * CASE WHEN ra.type = 'credit_card' THEN -1 ELSE 1 END
+      ) AS total_balance
+    FROM date_series ds
+    CROSS JOIN relevant_accounts ra
+    GROUP BY ds.chart_date
+    ORDER BY ds.chart_date ASC
   `;
 
-  return rows.map((r: Record<string, unknown>) => ({
-    date: String(r.date),
-    totalBalance: bigintToSafeNumber(r.total_balance as bigint),
+  return rows.map((r) => ({
+    date: r.date as string,
+    totalBalance: safeIntegerFromDb(r.total_balance, "total_balance"),
   }));
 }

@@ -26,20 +26,20 @@ export async function checkAccessAndSync(
   try {
     // 1. Match by google_sub
     const bySub =
-      await sql`SELECT id FROM "user" WHERE google_sub = ${providerAccountId} LIMIT 1`;
+      await sql<{ id: string }>`SELECT id FROM "user" WHERE google_sub = ${providerAccountId} LIMIT 1`;
 
     let matchedUserId: string | null = null;
     let needsSubPersist = false;
 
     if (bySub.length > 0) {
-      matchedUserId = bySub[0].id;
+      matchedUserId = bySub[0]!.id;
     } else {
       // 2. Fallback: match by lowercase email where google_sub is null
       const byEmail =
-        await sql`SELECT id FROM "user" WHERE lower(email) = ${normalizedEmail} AND google_sub IS NULL ORDER BY (id = ${userId}) DESC, created_at ASC LIMIT 1`;
+        await sql<{ id: string }>`SELECT id FROM "user" WHERE lower(email) = ${normalizedEmail} AND google_sub IS NULL ORDER BY (id = ${userId}) DESC, created_at ASC LIMIT 1`;
 
       if (byEmail.length > 0) {
-        matchedUserId = byEmail[0].id;
+        matchedUserId = byEmail[0]!.id;
         needsSubPersist = true;
       }
     }
@@ -79,10 +79,10 @@ export async function checkAccessAndSync(
 
     // 4. Persist google_sub on first match + refresh profile
     if (needsSubPersist) {
-      await sql`UPDATE "user" SET google_sub = ${providerAccountId}, email = ${normalizedEmail}, name = ${safeName}, image = ${providerImage}, updated_at = now() WHERE id = ${userId}`;
+      await sql`UPDATE "user" SET google_sub = ${providerAccountId}, email = ${normalizedEmail}, name = ${safeName}, image = ${providerImage}, updated_at = ${Date.now()} WHERE id = ${userId}`;
     } else {
       // 5. Refresh profile data from Google
-      await sql`UPDATE "user" SET email = ${normalizedEmail}, name = ${safeName}, image = ${providerImage}, updated_at = now() WHERE id = ${userId}`;
+      await sql`UPDATE "user" SET email = ${normalizedEmail}, name = ${safeName}, image = ${providerImage}, updated_at = ${Date.now()} WHERE id = ${userId}`;
     }
 
     logger.info("Auth access granted", {

@@ -1,5 +1,6 @@
 import { sql } from "@/db/client";
-import { bigintToSafeNumber } from "@/lib/money";
+import { isoFromMs } from "@/lib/date";
+import { safeIntegerFromDb } from "@/lib/money";
 import type {
   CreateBudgetItemInput,
   UpdateBudgetItemInput,
@@ -22,9 +23,9 @@ function mapRow(r: Record<string, unknown>): BudgetItemRow {
   return {
     id: r.id as string,
     name: r.name as string,
-    amountMinor: bigintToSafeNumber(r.amount_minor as bigint),
-    createdAt: String(r.created_at),
-    updatedAt: String(r.updated_at),
+    amountMinor: safeIntegerFromDb(r.amount_minor, "amount_minor"),
+    createdAt: isoFromMs(r.created_at),
+    updatedAt: isoFromMs(r.updated_at),
   };
 }
 
@@ -101,14 +102,14 @@ export async function update(
   const row = existing[0]!;
   const nextName = data.name ?? (row.name as string);
   const nextAmountMinor =
-    data.amountMinor ?? bigintToSafeNumber(row.amount_minor as bigint);
+    data.amountMinor ?? safeIntegerFromDb(row.amount_minor, "amount_minor");
 
   await sql`
     UPDATE budget_item
     SET
       name = ${nextName},
       amount_minor = ${nextAmountMinor},
-      updated_at = now(),
+      updated_at = ${Date.now()},
       updated_by_user_id = ${userId}
     WHERE id = ${id}
       AND workspace_id = ${workspaceId}

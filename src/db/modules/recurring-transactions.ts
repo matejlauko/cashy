@@ -1,6 +1,6 @@
 import { sql } from "@/db/client";
-import { currentMonthStart, nextMonthStart } from "@/lib/date";
-import { bigintToSafeNumber } from "@/lib/money";
+import { currentMonthStart, isoFromMs, nextMonthStart } from "@/lib/date";
+import { safeIntegerFromDb } from "@/lib/money";
 import type {
   CreateRecurringTransactionInput,
   UpdateRecurringTransactionInput,
@@ -39,7 +39,7 @@ export type RecurringTransactionRow = {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function mapRow(r: Record<string, unknown>): RecurringTransactionRow {
-  const amountMinor = bigintToSafeNumber(r.amount_minor as bigint);
+  const amountMinor = safeIntegerFromDb(r.amount_minor, "amount_minor");
   const type = r.type as "income" | "expense";
   return {
     id: r.id as string,
@@ -49,9 +49,10 @@ function mapRow(r: Record<string, unknown>): RecurringTransactionRow {
     amountMinor,
     signedAmount: type === "income" ? amountMinor : -amountMinor,
     dayOfMonth: Number(r.day_of_month),
-    addedThisMonth: r.added_this_month === true,
-    createdAt: String(r.created_at),
-    updatedAt: String(r.updated_at),
+    // SQLite returns EXISTS as 0 / 1
+    addedThisMonth: r.added_this_month === 1,
+    createdAt: isoFromMs(r.created_at),
+    updatedAt: isoFromMs(r.updated_at),
   };
 }
 
@@ -185,7 +186,7 @@ export async function update(
       : (row.financial_account_id as string | null);
   const nextType = data.type ?? (row.type as "income" | "expense");
   const nextAmountMinor =
-    data.amountMinor ?? bigintToSafeNumber(row.amount_minor as bigint);
+    data.amountMinor ?? safeIntegerFromDb(row.amount_minor, "amount_minor");
   const nextDayOfMonth = data.dayOfMonth ?? Number(row.day_of_month);
 
   await sql`
@@ -196,7 +197,7 @@ export async function update(
       type = ${nextType},
       amount_minor = ${nextAmountMinor},
       day_of_month = ${nextDayOfMonth},
-      updated_at = now(),
+      updated_at = ${Date.now()},
       updated_by_user_id = ${userId}
     WHERE id = ${id}
       AND workspace_id = ${workspaceId}
@@ -228,12 +229,13 @@ export async function archive(
     return true;
   }
 
+  const now = Date.now();
   const rows = await sql`
     UPDATE recurring_transaction
     SET
-      archived_at = now(),
+      archived_at = ${now},
       archived_by_user_id = ${userId},
-      updated_at = now(),
+      updated_at = ${now},
       updated_by_user_id = ${userId}
     WHERE id = ${id}
       AND workspace_id = ${workspaceId}

@@ -5,7 +5,7 @@ import { apiKey } from "@better-auth/api-key";
 import { drizzleDb } from "@/db/drizzle";
 import { sql } from "@/db/client";
 import * as schema from "@/db/schema/auth";
-import { env } from "@/env";
+import { env, isSecureOrigin } from "@/env";
 import { logger } from "@/logger";
 import { checkAccessAndSync } from "./access-control";
 
@@ -14,7 +14,7 @@ export const auth = betterAuth({
   basePath: "/api/auth",
   secret: env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(drizzleDb, {
-    provider: "pg",
+    provider: "sqlite",
     schema: {
       user: schema.user,
       account: schema.userAccount,
@@ -35,6 +35,16 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 45, // 45 days
     updateAge: 60 * 60 * 24, // 1 day
   },
+  advanced: {
+    // Stated explicitly so cookie names never depend on NODE_ENV, which is
+    // not reliably set on Workers.
+    useSecureCookies: isSecureOrigin,
+    ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
+  },
+  // The built-in limiter counts in isolate memory, which on Workers is
+  // short-lived and per location, so it would not limit anything.
+  rateLimit: { enabled: false },
+  telemetry: { enabled: false },
   plugins: [
     apiKey({
       enableSessionForAPIKeys: true,
@@ -67,10 +77,12 @@ export const auth = betterAuth({
       const userId = newSession.user.id;
 
       // Get the Google provider account to extract the sub
-      const accounts =
-        await sql`SELECT account_id FROM user_account WHERE user_id = ${userId} AND provider_id = 'google' LIMIT 1`;
+      const accounts = await sql<{ account_id: string }>`
+        SELECT account_id FROM user_account
+        WHERE user_id = ${userId} AND provider_id = 'google' LIMIT 1`;
 
-      if (accounts.length === 0) {
+      const googleSub = accounts[0]?.account_id;
+      if (!googleSub) {
         logger.warn("Auth deny: no Google provider account found", { userId });
         await ctx.context.internalAdapter.deleteSession(
           newSession.session.token,
@@ -78,7 +90,6 @@ export const auth = betterAuth({
         throw ctx.redirect("/login?error=access_denied");
       }
 
-      const googleSub = accounts[0].account_id;
       const result = await checkAccessAndSync({
         userId,
         providerAccountId: googleSub,
@@ -96,3 +107,9 @@ export const auth = betterAuth({
     }),
   },
 });
+
+// Warm-up. The first use of auth.api builds every endpoint, which is far more
+// CPU than a request gets on the Workers free plan (10 ms); at module scope it
+// is charged to the 1 s startup budget instead. Neither call does I/O.
+await auth.$context;
+await auth.api.getSession({ headers: new Headers() });

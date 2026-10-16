@@ -7,9 +7,9 @@ export const sessionRoute = new Hono<AppEnv>().get("/", async (c) => {
   const workspaceId = c.get("workspaceId");
 
   const rows =
-    await sql`SELECT w.id, w.name FROM workspace w JOIN workspace_membership wm ON wm.workspace_id = w.id WHERE wm.user_id = ${user.id} AND wm.deleted_at IS NULL ORDER BY w.name ASC`;
+    await sql<{ id: string; name: string }>`SELECT w.id, w.name FROM workspace w JOIN workspace_membership wm ON wm.workspace_id = w.id WHERE wm.user_id = ${user.id} AND wm.deleted_at IS NULL ORDER BY w.name ASC`;
 
-  const workspaces = rows.map((r: { id: string; name: string }) => ({
+  const workspaces = rows.map((r) => ({
     id: r.id,
     name: r.name,
   }));

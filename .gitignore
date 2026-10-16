@@ -23,6 +23,12 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.local
 ops/k8s/*.env
 
+# cloudflare
+.wrangler
+.dev.vars*
+!.dev.vars.example
+worker-configuration.d.ts
+
 # caches
 .eslintcache
 .cache

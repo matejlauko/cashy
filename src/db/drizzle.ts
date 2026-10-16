@@ -1,4 +1,5 @@
-import { drizzle } from "drizzle-orm/bun-sql";
-import { sql } from "@/db/client";
+import { env } from "cloudflare:workers";
+import { drizzle } from "drizzle-orm/d1";
 
-export const drizzleDb = drizzle({ client: sql });
+// Used by Better Auth only; app queries go through `sql` in ./client.
+export const drizzleDb = drizzle(env.DB);

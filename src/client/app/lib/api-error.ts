@@ -5,8 +5,15 @@ type ApiErrorPayload = {
 
 export type AppError = Error & { code?: string };
 
+// The parts of a fetch Response (or a Hono RPC response) read below.
+type ResponseLike = {
+  status: number;
+  statusText: string;
+  json(): Promise<unknown>;
+};
+
 export async function parseApiError(
-  res: Response,
+  res: ResponseLike,
 ): Promise<{ code: string; message: string }> {
   try {
     const body = (await res.json()) as ApiErrorPayload;

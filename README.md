@@ -1,60 +1,62 @@
 # Cashy
 
-Personal household money tracker built with Bun, Hono, React, and PostgreSQL.
+Personal household money tracker. A React frontend and a Hono API served by one Cloudflare Worker, with Cloudflare D1 (SQLite) as the database and Better Auth for Google sign-in.
 
 ## Local Development
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) >= 1.x
-- [Docker](https://docs.docker.com/get-docker/) (for PostgreSQL)
+- [Bun](https://bun.sh) >= 1.3 (package manager, tests, scripts, CLI)
+- [Node.js](https://nodejs.org) 20.19+ or 22.12+ (Vite and the Workers tooling run on it)
 
 ### Setup
 
-1. Start PostgreSQL:
-
-   ```bash
-   docker compose up -d
-   ```
-
-2. Copy environment file and adjust values:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Install dependencies:
+1. Install dependencies:
 
    ```bash
    bun install
    ```
 
-4. Push database schema:
+2. Copy the local environment file and fill in the values:
 
    ```bash
-   bunx drizzle-kit push
+   cp .dev.vars.example .dev.vars
    ```
 
-5. Start development server:
+3. Create the local database. Either load a backup (a D1 backup or an old PostgreSQL dump in `backups/`):
+
+   ```bash
+   bun run db:restore:local
+   ```
+
+   or start empty and add yourself with `scripts/bootstrap-user-workspace.sql`:
+
+   ```bash
+   bun run db:migrate:local
+   ```
+
+4. Start the development server:
+
    ```bash
    bun dev
    ```
 
-The app runs at http://localhost:3000.
+The app runs at http://localhost:3000. Vite serves the pages with hot reload; `/api/*` runs in the Workers runtime against a local D1 database stored in `.wrangler/state/`.
 
-### Building for Production
+### Commands
 
-```bash
-bun run build
-```
-
-Bundles frontend assets into `dist/`.
-
-### Running Production Locally
-
-```bash
-bun start
-```
+| Command | What it does |
+| --- | --- |
+| `bun dev` | Development server on port 3000 |
+| `bun run build` | Production build into `dist/` |
+| `bun run preview` | Build, then serve the production build locally |
+| `bun test` | Unit tests |
+| `bun run typecheck` | Regenerate Worker types and run `tsc` |
+| `bun run deploy` | Build, apply migrations to the remote database, deploy |
+| `bun run db:generate` | Generate a migration from `src/db/schema/` |
+| `bun run db:migrate:local` | Apply migrations to the local database |
+| `bun run db:backup` | Back up the remote database into `backups/` |
+| `bun run db:restore:local` | Replace the local database with a backup |
 
 ## CLI
 
@@ -92,149 +94,56 @@ specify for a date are carried forward at their existing balances (`balance
 set` reports "(n account(s) carried forward…)", `import` appends "(+n carried
 forward)").
 
-## Docker
+## Deployment
 
-### Build
-
-```bash
-docker build -t cashy-app .
-```
-
-### Run
+Production is the Worker `cashy` at https://cashy.lauko.io with the D1 database `cashy`.
 
 ```bash
-docker run --rm \
-  --env-file .env \
-  -e NODE_ENV=production \
-  -p 3000:3000 \
-  cashy-app
+bun run deploy
 ```
 
-The container needs network access to PostgreSQL. When running alongside the compose PostgreSQL, use `--network host` or configure Docker networking.
+First-time setup, the data migration from PostgreSQL, the cutover and rollback steps, backups and schema changes are in [docs/cloudflare-deploy.md](docs/cloudflare-deploy.md).
 
-## Production Deployment (k3s)
+Configuration:
 
-This setup is intentionally small and self-hosted:
-
-- Single-node `k3s`
-- Built-in Traefik ingress controller
-- Built-in `local-path` storage class
-- In-cluster PostgreSQL
-- Automatic TLS via cert-manager + Let's Encrypt
-- App image built locally and imported directly into k3s
-
-### Prerequisites
-
-- DNS for `cashy.lauko.io` points at your VPS
-- Ports `80` and `443` are reachable from the internet
-- `kubectl`, `docker`, `sudo`, and `bun` are available on the machine you use for deploys
-- `k3s` is installed on the VPS
+- `wrangler.jsonc` holds the Worker config and the non-secret vars (`APP_URL`, `LOG_LEVEL`).
+- `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are Worker secrets (`bunx wrangler secret put <NAME>`).
+- Locally, `.dev.vars` provides all five.
 
 Google OAuth for web apps requires HTTPS outside localhost, so `APP_URL` must be the final `https://...` URL before login will work.
 
-### One-time Configuration
+## Database
 
-1. Copy the secret env files:
+D1 is SQLite. A few rules the code relies on:
 
-   ```bash
-   cp ops/k8s/app.env.example ops/k8s/app.env
-   cp ops/k8s/postgres.env.example ops/k8s/postgres.env
-   ```
-
-2. Edit `ops/k8s/app.env`:
-   - Set `APP_URL=https://cashy.lauko.io`
-   - Set `DATABASE_URL=postgres://app:<password>@postgres:5432/app`
-   - Fill in `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET`
-
-3. Edit `ops/k8s/postgres.env`:
-   - Set `POSTGRES_PASSWORD` to the same password used in `DATABASE_URL`
-
-4. Edit `ops/k8s/cluster-issuer.yaml`:
-   - Replace `replace-with-real-email@example.com` with your real Let's Encrypt email
-
-5. If you are not using `cashy.lauko.io`, update the host in `ops/k8s/ingress.yaml` and `APP_URL` in `ops/k8s/app.env` to the same final hostname.
-
-### First Deploy
-
-1. Apply the app and database secrets:
-
-   ```bash
-   ./scripts/k3s-apply-secrets.sh
-   ```
-
-2. Build the image and import it into k3s:
-
-   ```bash
-   IMAGE_TAG=$(git rev-parse --short HEAD) ./scripts/k3s-build-image.sh
-   ```
-
-3. Push the database schema:
-
-   ```bash
-   ./scripts/k3s-db-push.sh
-   ```
-
-4. Deploy the manifests:
-
-   ```bash
-   IMAGE_TAG=$(git rev-parse --short HEAD) ./scripts/k3s-deploy.sh
-   ```
-
-5. Verify the rollout:
-
-   ```bash
-   kubectl -n cashy get pods
-   kubectl -n cashy get ingress
-   kubectl describe clusterissuer letsencrypt-production
-   ```
-
-6. Smoke test:
-   - `curl -I https://cashy.lauko.io/healthz`
-   - `curl -I https://cashy.lauko.io/readyz`
-   - Open the app and complete Google login
-
-The first certificate issuance can take a minute or two after the ingress is created.
-
-### Updating the App
-
-1. Build and import a new image:
-
-   ```bash
-   IMAGE_TAG=$(git rev-parse --short HEAD) ./scripts/k3s-build-image.sh
-   ```
-
-2. If the schema changed, push it before the rollout:
-
-   ```bash
-   ./scripts/k3s-db-push.sh
-   ```
-
-3. Deploy the new image:
-   ```bash
-   IMAGE_TAG=$(git rev-parse --short HEAD) ./scripts/k3s-deploy.sh
-   ```
+- Instants are stored as integer epoch milliseconds; calendar dates as `'YYYY-MM-DD'` text.
+- There are no interactive transactions. Multi-statement writes go through `batch()` in `src/db/client.ts`, which is atomic.
+- Schema lives in `src/db/schema/`; migrations in `migrations/` are generated by drizzle-kit and applied by Wrangler.
 
 ### Backups
 
-Create a local SQL backup through a temporary tunnel to the in-cluster database:
-
 ```bash
-BACKUP_DIR=/srv/backups/cashy ./scripts/k3s-backup-db.sh
+bun run db:backup
 ```
 
-Keep those backups off the VPS as well if you care about recovery from disk loss.
+writes `backups/<timestamp>/schema.sql` and `data.sql`. D1 also keeps 7 days of point-in-time restore (`wrangler d1 time-travel`). Keep the backups off the machine as well if you care about recovery from disk loss.
 
 ## Health Endpoints
 
 | Endpoint   | Purpose         | Success | Failure                 |
 | ---------- | --------------- | ------- | ----------------------- |
-| `/healthz` | Process alive   | 200 OK  | No response             |
+| `/healthz` | Worker responds | 200 OK  | 500 if misconfigured    |
 | `/readyz`  | DB connectivity | 200 OK  | 503 Service Unavailable |
+
+## Legacy stack
+
+`Dockerfile`, `compose.yaml`, `ops/k8s/` and `scripts/k3s-*.sh` belong to the previous Bun + PostgreSQL deployment on k3s. They no longer build from this tree and are kept only until the cutover has settled; see "Afterwards" in [docs/cloudflare-deploy.md](docs/cloudflare-deploy.md).
 
 ## Reference Docs
 
-- https://bun.com/docs/runtime/http/server
-- https://bun.com/docs/bundler/fullstack
+- https://developers.cloudflare.com/workers/vite-plugin/
+- https://developers.cloudflare.com/workers/static-assets/
+- https://developers.cloudflare.com/d1/
 - https://hono.dev/docs/guides/rpc
 - https://better-auth.com/docs/integrations/hono
 - https://better-auth.com/docs/authentication/google

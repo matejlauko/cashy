@@ -81,6 +81,17 @@ export function formatDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Format epoch milliseconds (how the database stores instants) as an
+ * ISO 8601 UTC string.
+ */
+export function isoFromMs(ms: unknown): string {
+  if (typeof ms !== "number" || !Number.isFinite(ms)) {
+    throw new Error(`Invalid epoch milliseconds: "${String(ms)}"`);
+  }
+  return new Date(ms).toISOString();
+}
+
 // ─── Month-key helpers (YYYY-MM format) ─────────────────────────────────────
 
 const MONTH_KEY_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
